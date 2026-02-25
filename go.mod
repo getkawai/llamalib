@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	github.com/ebitengine/purego v0.10.0
+	github.com/getkawai/tools v0.1.0
 	github.com/google/uuid v1.6.0
 	github.com/jupiterrider/ffi v0.6.0
 	github.com/kawai-network/grab v0.1.0
@@ -30,5 +31,5 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 )

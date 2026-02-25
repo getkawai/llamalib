@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/kawai-network/veridium/pkg/fantasy/tools"
+	"github.com/getkawai/tools"
 )
 
 // ToolCallResult represents a parsed tool call from LLM output.
