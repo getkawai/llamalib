@@ -12,8 +12,10 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/ISU=
 github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
-github.com/getkawai/tools v0.1.0 h1:30s/sjR30R/CZtl2xCQT0VPo3AuL482el+CC7UNEbT4=
-github.com/getkawai/tools v0.1.0/go.mod h1:HlHm0XBS7XNNU8r8pAbFgFar5kSs+57KVirxExu3zM8=
+github.com/getkawai/tools v0.1.1 h1:DbUwTkND7t5fSQEBfw+5mJY+fL9Z4fSusO/w4SLtE1I=
+github.com/getkawai/tools v0.1.1/go.mod h1:856cjJSlczKvW3npII2Wv6hL4xS+CsBTtD1MdDYU/sI=
+github.com/getkawai/unillm v0.1.1 h1:Y77gVMNS990xsELknrtDjY6C7Yt6YY8NbhdVwyM1tCk=
+github.com/getkawai/unillm v0.1.1/go.mod h1:vGzh5s0pBFJ2M0ywakzrLNhHlwKNwgX1J/qME6HEeM0=
 github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e h1:Lf/gRkoycfOBPa42vU2bbgPurFong6zXeFtPoxholzU=
 github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e/go.mod h1:uNVvRXArCGbZ508SxYYTC5v1JWoz2voff5pm25jU1Ok=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
@@ -45,8 +47,6 @@ github.com/kaptinlin/messageformat-go v0.4.18 h1:RBlHVWgZyoxTcUgGWBsl2AcyScq/urq
 github.com/kaptinlin/messageformat-go v0.4.18/go.mod h1:ntI3154RnqJgr7GaC+vZBnIExl2V3sv9selvRNNEM24=
 github.com/kawai-network/grab v0.1.0 h1:fqL+IK+AjvyB0F3Rab0xFOw0+jTZawiqQnumgmIWmNs=
 github.com/kawai-network/grab v0.1.0/go.mod h1:yZ+7Bf10u8Dgr3GtAHgLv37wOSXewtU3GlxD/kNhqks=
-github.com/kawai-network/veridium v0.0.0-20260223154704-91e538e31def h1:rQTG561BS6tj+etSotzNc4hYmvIrJMGcq9NXIgElT1g=
-github.com/kawai-network/veridium v0.0.0-20260223154704-91e538e31def/go.mod h1:+1qkhX1myh/TaQ+oRAj7tFiM0dehSJWH7w6W9go8Jg8=
 github.com/kawai-network/y v0.1.14 h1:FH+/xIh3KIG3n7BoVZ435nOB6k41o8/7XrBV9jCiByQ=
 github.com/kawai-network/y v0.1.14/go.mod h1:eGBQA+pB+NbTklBBpNwAyEx+rNvN5+dxmeec+L/4TDc=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
