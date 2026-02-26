@@ -47,8 +47,8 @@ github.com/kawai-network/grab v0.1.0 h1:fqL+IK+AjvyB0F3Rab0xFOw0+jTZawiqQnumgmIW
 github.com/kawai-network/grab v0.1.0/go.mod h1:yZ+7Bf10u8Dgr3GtAHgLv37wOSXewtU3GlxD/kNhqks=
 github.com/kawai-network/veridium v0.0.0-20260223154704-91e538e31def h1:rQTG561BS6tj+etSotzNc4hYmvIrJMGcq9NXIgElT1g=
 github.com/kawai-network/veridium v0.0.0-20260223154704-91e538e31def/go.mod h1:+1qkhX1myh/TaQ+oRAj7tFiM0dehSJWH7w6W9go8Jg8=
-github.com/kawai-network/y v0.1.9 h1:cza9L7OOiOUIoHiHcn3jCVbpgqMEjoQKT9yeOQpT65g=
-github.com/kawai-network/y v0.1.9/go.mod h1:RVus9yUCEgUWbnf9mMN5rcnc+b9MNd4lMFVVjZ0hX/4=
+github.com/kawai-network/y v0.1.10 h1:rtQdl+vc4Uj/IWrAdKk18TsRagq4pf7VO526B4eheFA=
+github.com/kawai-network/y v0.1.10/go.mod h1:OQgDJ4RXpmG/ZrwaQkOQTEt52oWdMr9ZPVHC1//OR08=
 github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd h1:TRLaZ9cD/w8PVh93nsPXa1VrQ6jlwL5oN8l14QlcNfg=
 github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd/go.mod h1:6dJC0mAP4ikYIbvyc7fijjWJddQyLn8Ig3JB5CqoB9Q=

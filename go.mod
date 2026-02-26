@@ -9,7 +9,7 @@ require (
 	github.com/jupiterrider/ffi v0.6.0
 	github.com/kawai-network/grab v0.1.0
 	github.com/kawai-network/veridium v0.0.0-20260223154704-91e538e31def
-	github.com/kawai-network/y v0.1.9
+	github.com/kawai-network/y v0.1.10
 	github.com/nikolalohinski/gonja/v2 v2.6.0
 	golang.org/x/sys v0.41.0
 )
