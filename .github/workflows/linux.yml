@@ -87,8 +87,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          # Run tests excluding mtmd package which requires image test fixtures
-          go test -v $(go list ./... | grep -v /mtmd)
+          go test -v ./...
 
       - name: Run inference test
         run: go run ./examples/hello
