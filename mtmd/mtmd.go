@@ -2,6 +2,7 @@ package mtmd
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"unsafe"
 
@@ -45,12 +46,14 @@ type ContextParamsType struct {
 }
 
 var (
-	// FFITypeContextParams represents the C struct mtmd_context_params
-	FFITypeContextParams = ffi.NewType(&ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer,
-		&ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer)
+	ffiTypeSize = ffi.TypeUint64
 
-	// FFITypeInputText represents the C struct mtmd_input_text
-	FFITypeInputText = ffi.NewType(&ffi.TypePointer, &ffi.TypeUint8, &ffi.TypeUint8)
+	// ffiTypeContextParams represents the C struct mtmd_context_params
+	ffiTypeContextParams = ffi.NewType(&ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer,
+		&ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffiTypeSize)
+
+	// ffiTypeInputText represents the C struct mtmd_input_text
+	ffiTypeInputText = ffi.NewType(&ffi.TypePointer, &ffi.TypeUint8, &ffi.TypeUint8)
 )
 
 var (
@@ -88,6 +91,16 @@ var (
 	//                                          llama_pos * new_n_past);
 	helperEvalChunksFunc ffi.Fun
 
+	// MTMD_API int32_t mtmd_encode_chunk(mtmd_context * ctx,
+	//                               const mtmd_input_chunk * chunk);
+	encodeChunkFunc ffi.Fun
+
+	// get output embeddings from the last encode pass
+	// the reading size (in bytes) is equal to:
+	// llama_model_n_embd_inp(model) * mtmd_input_chunk_get_n_tokens(chunk) * sizeof(float)
+	// MTMD_API float * mtmd_get_output_embd(mtmd_context * ctx);
+	getOutputEmbdFunc ffi.Fun
+
 	// MTMD_API bool mtmd_decode_use_non_causal(mtmd_context * ctx);
 	decodeUseNonCausalFunc ffi.Fun
 
@@ -115,11 +128,11 @@ func loadFuncs(lib ffi.Lib) error {
 		return loadError("mtmd_default_marker", err)
 	}
 
-	if contextParamsDefaultFunc, err = lib.Prep("mtmd_context_params_default", &FFITypeContextParams); err != nil {
+	if contextParamsDefaultFunc, err = lib.Prep("mtmd_context_params_default", &ffiTypeContextParams); err != nil {
 		return loadError("mtmd_context_params_default", err)
 	}
 
-	if initFromFileFunc, err = lib.Prep("mtmd_init_from_file", &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &FFITypeContextParams); err != nil {
+	if initFromFileFunc, err = lib.Prep("mtmd_init_from_file", &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffiTypeContextParams); err != nil {
 		return loadError("mtmd_init_from_file", err)
 	}
 
@@ -131,7 +144,7 @@ func loadFuncs(lib ffi.Lib) error {
 		return loadError("mtmd_support_vision", err)
 	}
 
-	if tokenizeFunc, err = lib.Prep("mtmd_tokenize", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeUint64); err != nil {
+	if tokenizeFunc, err = lib.Prep("mtmd_tokenize", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffiTypeSize); err != nil {
 		return loadError("mtmd_tokenize", err)
 	}
 
@@ -139,6 +152,14 @@ func loadFuncs(lib ffi.Lib) error {
 		&ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypeUint8, &ffi.TypePointer); err != nil {
 
 		return loadError("mtmd_helper_eval_chunks", err)
+	}
+
+	if encodeChunkFunc, err = lib.Prep("mtmd_encode_chunk", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer); err != nil {
+		return loadError("mtmd_encode_chunk", err)
+	}
+
+	if getOutputEmbdFunc, err = lib.Prep("mtmd_get_output_embd", &ffi.TypePointer, &ffi.TypePointer); err != nil {
+		return loadError("mtmd_get_output_embd", err)
 	}
 
 	if decodeUseNonCausalFunc, err = lib.Prep("mtmd_decode_use_non_causal", &ffi.TypeUint8, &ffi.TypePointer); err != nil {
@@ -243,7 +264,7 @@ func Tokenize(ctx Context, out InputChunks, text *InputText, bitmaps []Bitmap) i
 	nBitmaps := uint64(len(bitmaps))
 
 	var result ffi.Arg
-	tokenizeFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), unsafe.Pointer(&out), unsafe.Pointer(&text), unsafe.Pointer(&bt), unsafe.Pointer(&nBitmaps))
+	tokenizeFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), unsafe.Pointer(&out), unsafe.Pointer(&text), unsafe.Pointer(&bt), &nBitmaps)
 
 	return int32(result)
 }
@@ -273,10 +294,44 @@ func HelperEvalChunks(ctx Context, lctx llama.Context, chunks InputChunks, nPast
 	defer muHelperEvalChunks.Unlock()
 
 	var result ffi.Arg
-	helperEvalChunksFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), unsafe.Pointer(&lctx), unsafe.Pointer(&chunks), unsafe.Pointer(&nPast), unsafe.Pointer(&seqID),
-		unsafe.Pointer(&nBatch), unsafe.Pointer(&logitsLast), unsafe.Pointer(&newNPast))
+	helperEvalChunksFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), unsafe.Pointer(&lctx), unsafe.Pointer(&chunks), &nPast, &seqID,
+		&nBatch, &logitsLast, unsafe.Pointer(&newNPast))
 
 	return int32(result)
+}
+
+// EncodeChunk encodes a single input chunk (image/audio).
+// This function is NOT thread-safe.
+func EncodeChunk(ctx Context, chunk InputChunk) error {
+	if ctx == 0 {
+		return errors.New("invalid mtmd context handle")
+	}
+
+	var result ffi.Arg
+	encodeChunkFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), unsafe.Pointer(&chunk))
+	if int32(result) != 0 {
+		return fmt.Errorf("mtmd_encode_chunk failed: %d", result)
+	}
+
+	return nil
+}
+
+// GetOutputEmbd returns the output embedding from the last encode pass.
+// You must pass in the embedSize for the slice to be returned, which is equal to:
+// llama.ModelNEmbdInp(model) * int32(InputChunkGetNTokens(chunk))
+func GetOutputEmbd(ctx Context, embedSize int32) ([]float32, error) {
+	if ctx == 0 {
+		return nil, errors.New("invalid mtmd context handle")
+	}
+
+	var embdPtr unsafe.Pointer
+	getOutputEmbdFunc.Call(unsafe.Pointer(&embdPtr), unsafe.Pointer(&ctx))
+	if embdPtr == nil {
+		return nil, errors.New("mtmd_get_output_embd returned null pointer")
+	}
+
+	embdSlice := unsafe.Slice((*float32)(embdPtr), embedSize)
+	return embdSlice, nil
 }
 
 // DecodeUseNonCausal checks if the non-causal mask needs to be set before llama_decode.
