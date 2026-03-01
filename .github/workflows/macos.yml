@@ -87,8 +87,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          # Run tests with -short flag to skip TestInstall (GitHub API rate limit on macOS)
-          go test -short -v ./...
+          go test -v ./...
 
       - name: Run inference test
         run: go run ./examples/hello
