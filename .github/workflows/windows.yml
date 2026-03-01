@@ -1,0 +1,105 @@
+name: Windows
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+
+      - name: Install vcredist
+        shell: pwsh
+        run: |
+          curl -o VC_redist.x64.exe -L https://aka.ms/vs/17/release/vc_redist.x64.exe
+          Start-Process VC_redist.x64.exe -ArgumentList "/install /quiet /norestart" -Wait
+
+      - name: Get latest llama.cpp version
+        id: llama-version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(gh api repos/ggml-org/llama.cpp/releases/latest --jq '.tag_name')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest llama.cpp version: $VERSION"
+
+      - name: Setup test environment
+        shell: pwsh
+        run: |
+          ./scripts/setup-tests.ps1 -LibDir "$env:GITHUB_WORKSPACE\lib" -ModelsDir "$env:GITHUB_WORKSPACE\models" -LlamaVersion "${{ steps.llama-version.outputs.version }}"
+
+      - name: Set test library path
+        run: |
+          echo "$env:GITHUB_WORKSPACE\lib" | Out-File -Append -FilePath $env:GITHUB_PATH -Encoding utf8
+          echo "YZMA_LIB=$env:GITHUB_WORKSPACE\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build examples
+        shell: bash
+        run: |
+          set -e
+          for dir in ./examples/*/; do
+            if [ -f "$dir/main.go" ]; then
+              echo "Building $dir..."
+              go build -o /dev/null "$dir"
+            fi
+          done
+
+      - name: Cache test models
+        id: cache-models
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: ${{ runner.os }}-models-v1
+
+      - name: Download test models (if not cached)
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          mkdir -p ./models
+          Invoke-WebRequest -Uri "https://huggingface.co/QuantFactory/SmolLM-135M-GGUF/resolve/main/SmolLM-135M.Q2_K.gguf" -OutFile "./models/SmolLM-135M.Q2_K.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf" -OutFile "./models/SmolVLM-256M-Instruct-Q8_0.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf" -OutFile "./models/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/ggml-org/models-moved/resolve/main/jina-reranker-v1-tiny-en/ggml-model-f16.gguf" -OutFile "./models/ggml-model-f16.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/callgg/t5-base-encoder-f32/resolve/main/t5base-encoder-q4_0.gguf" -OutFile "./models/t5base-encoder-q4_0.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/deadprogram/yzma-tests/resolve/main/Gemma2-Base-F32.gguf" -OutFile "./models/Gemma2-Base-F32.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/deadprogram/yzma-tests/resolve/main/Gemma2-Lora-F32-LoRA.gguf" -OutFile "./models/Gemma2-Lora-F32-LoRA.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00001-of-00003.gguf" -OutFile "./models/stories15M-q8_0-00001-of-00003.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00002-of-00003.gguf" -OutFile "./models/stories15M-q8_0-00002-of-00003.gguf"
+          Invoke-WebRequest -Uri "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00003-of-00003.gguf" -OutFile "./models/stories15M-q8_0-00003-of-00003.gguf"
+
+      - name: Set test environment variables
+        run: |
+          echo "YZMA_TEST_MODEL=$env:GITHUB_WORKSPACE\models\SmolLM-135M.Q2_K.gguf" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "YZMA_TEST_MMMODEL=$env:GITHUB_WORKSPACE\models\SmolVLM-256M-Instruct-Q8_0.gguf" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "YZMA_TEST_MMPROJ=$env:GITHUB_WORKSPACE\models\mmproj-SmolVLM-256M-Instruct-Q8_0.gguf" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "YZMA_TEST_QUANTIZE_MODEL=$env:GITHUB_WORKSPACE\models\ggml-model-f16.gguf" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "YZMA_TEST_ENCODER_MODEL=$env:GITHUB_WORKSPACE\models\t5base-encoder-q4_0.gguf" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "YZMA_TEST_LORA_MODEL=$env:GITHUB_WORKSPACE\models\Gemma2-Base-F32.gguf" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "YZMA_TEST_LORA_ADAPTER=$env:GITHUB_WORKSPACE\models\Gemma2-Lora-F32-LoRA.gguf" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "YZMA_TEST_SPLIT_MODELS=$env:GITHUB_WORKSPACE\models\stories15M-q8_0-00001-of-00003.gguf,$env:GITHUB_WORKSPACE\models\stories15M-q8_0-00002-of-00003.gguf,$env:GITHUB_WORKSPACE\models\stories15M-q8_0-00003-of-00003.gguf" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run unit tests
+        run: |
+          go test -v ./...
+
+      - name: Run inference test
+        run: go run ./examples/hello
+
+      - name: Run embedding test
+        run: go run ./examples/embeddings -model $env:GITHUB_WORKSPACE\models\SmolLM-135M.Q2_K.gguf -p "Hello World"

@@ -1,0 +1,96 @@
+name: macOS
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+
+      - name: Get latest llama.cpp version
+        id: llama-version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(gh api repos/ggml-org/llama.cpp/releases/latest --jq '.tag_name')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest llama.cpp version: $VERSION"
+
+      - name: Setup test environment
+        run: |
+          chmod +x ./scripts/setup-tests.sh
+          ./scripts/setup-tests.sh $GITHUB_WORKSPACE/lib $GITHUB_WORKSPACE/models ${{ steps.llama-version.outputs.version }}
+
+      - name: Add llama.cpp libs to path
+        run: |
+          echo "YZMA_LIB=$GITHUB_WORKSPACE/lib" >> "$GITHUB_ENV"
+          echo "$GITHUB_WORKSPACE/lib" >> $GITHUB_PATH
+
+      - name: Build examples
+        run: |
+          set -e
+          for dir in ./examples/*/; do
+            if [ -f "$dir/main.go" ]; then
+              echo "Building $dir..."
+              go build -o /dev/null "$dir"
+            fi
+          done
+
+      - name: Cache test models
+        id: cache-models
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: ${{ runner.os }}-models-v1
+
+      - name: Download test models (if not cached)
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ./models
+          curl -L -o ./models/SmolLM-135M.Q2_K.gguf https://huggingface.co/QuantFactory/SmolLM-135M-GGUF/resolve/main/SmolLM-135M.Q2_K.gguf
+          curl -L -o ./models/SmolVLM-256M-Instruct-Q8_0.gguf https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf
+          curl -L -o ./models/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf
+          curl -L -o ./models/ggml-model-f16.gguf https://huggingface.co/ggml-org/models-moved/resolve/main/jina-reranker-v1-tiny-en/ggml-model-f16.gguf
+          curl -L -o ./models/t5base-encoder-q4_0.gguf https://huggingface.co/callgg/t5-base-encoder-f32/resolve/main/t5base-encoder-q4_0.gguf
+          curl -L -o ./models/Gemma2-Base-F32.gguf https://huggingface.co/deadprogram/yzma-tests/resolve/main/Gemma2-Base-F32.gguf
+          curl -L -o ./models/Gemma2-Lora-F32-LoRA.gguf https://huggingface.co/deadprogram/yzma-tests/resolve/main/Gemma2-Lora-F32-LoRA.gguf
+          curl -L -o ./models/stories15M-q8_0-00001-of-00003.gguf https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00001-of-00003.gguf
+          curl -L -o ./models/stories15M-q8_0-00002-of-00003.gguf https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00002-of-00003.gguf
+          curl -L -o ./models/stories15M-q8_0-00003-of-00003.gguf https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00003-of-00003.gguf
+
+      - name: Set test environment variables
+        run: |
+          echo "YZMA_TEST_MODEL=$GITHUB_WORKSPACE/models/SmolLM-135M.Q2_K.gguf" >> "$GITHUB_ENV"
+          echo "YZMA_TEST_MMMODEL=$GITHUB_WORKSPACE/models/SmolVLM-256M-Instruct-Q8_0.gguf" >> "$GITHUB_ENV"
+          echo "YZMA_TEST_MMPROJ=$GITHUB_WORKSPACE/models/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf" >> "$GITHUB_ENV"
+          echo "YZMA_TEST_QUANTIZE_MODEL=$GITHUB_WORKSPACE/models/ggml-model-f16.gguf" >> "$GITHUB_ENV"
+          echo "YZMA_TEST_ENCODER_MODEL=$GITHUB_WORKSPACE/models/t5base-encoder-q4_0.gguf" >> "$GITHUB_ENV"
+          echo "YZMA_TEST_LORA_MODEL=$GITHUB_WORKSPACE/models/Gemma2-Base-F32.gguf" >> "$GITHUB_ENV"
+          echo "YZMA_TEST_LORA_ADAPTER=$GITHUB_WORKSPACE/models/Gemma2-Lora-F32-LoRA.gguf" >> "$GITHUB_ENV"
+          echo "YZMA_TEST_SPLIT_MODELS=$GITHUB_WORKSPACE/models/stories15M-q8_0-00001-of-00003.gguf,$GITHUB_WORKSPACE/models/stories15M-q8_0-00002-of-00003.gguf,$GITHUB_WORKSPACE/models/stories15M-q8_0-00003-of-00003.gguf" >> "$GITHUB_ENV"
+
+      - name: Run unit tests
+        run: |
+          go test -v ./...
+
+      - name: Run inference test
+        run: go run ./examples/hello
+
+      - name: Run embedding test
+        run: go run ./examples/embeddings -model $GITHUB_WORKSPACE/models/SmolLM-135M.Q2_K.gguf -p "Hello World"
