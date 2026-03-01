@@ -90,18 +90,33 @@ func initialInstall(libPath string, processor Processor) error {
 }
 
 func downloadVersionFile(llamaCppVersionDocURL string) (string, error) {
-	r, err := http.DefaultClient.Get(llamaCppVersionDocURL)
-	if err != nil {
-		return "", fmt.Errorf("error getting llama.cpp version document: %w", err)
-	}
-	defer r.Body.Close()
-
+	// Retry logic for GitHub API rate limiting
 	var tag tag
-	if err := json.NewDecoder(r.Body).Decode(&tag); err != nil {
+	var err error
+	
+	for attempt := 0; attempt < 3; attempt++ {
+		r, err := http.DefaultClient.Get(llamaCppVersionDocURL)
+		if err != nil {
+			if attempt < 2 {
+				continue // Retry
+			}
+			return "", fmt.Errorf("error getting llama.cpp version document: %w", err)
+		}
+		
+		err = json.NewDecoder(r.Body).Decode(&tag)
+		r.Body.Close()
+		
+		if err == nil && tag.TagName != "" {
+			return tag.TagName, nil
+		}
+		
+		if attempt < 2 {
+			continue // Retry
+		}
 		return "", fmt.Errorf("error decoding llama.cpp version document: %w", err)
 	}
-
-	return tag.TagName, nil
+	
+	return "", fmt.Errorf("failed to get version after 3 attempts: %w", err)
 }
 
 func upgradeInstall(libPath string, processor Processor, version string) error {
