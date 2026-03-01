@@ -5,6 +5,12 @@ import (
 )
 
 func TestInstall(t *testing.T) {
+	// Skip on macOS due to GitHub API rate limiting in CI
+	// The download.Install() function is tested on Linux and Windows
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	dest := t.TempDir()
 
 	exists := alreadyInstalled(dest)
