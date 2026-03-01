@@ -92,38 +92,42 @@ echo "📥 Downloading llama.cpp binaries..."
 
 # Get latest version if not specified
 if [ "$LLAMA_VERSION" = "latest" ]; then
-    LLAMA_VERSION=$(curl -s https://api.github.com/repos/ggml-org/llama.cpp/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+    LLAMA_VERSION=$(gh api repos/ggml-org/llama.cpp/releases/latest --jq '.tag_name')
     echo "   Latest version: $LLAMA_VERSION"
 fi
 
-# Build download URL based on platform
+# Build download URL based on platform (new format: llama-VERSION-bin-OS-ARCH.tar.gz)
 case "$OS-$PROCESSOR" in
     linux-cpu)
         LIB_NAME="libllama.so"
-        URL_BASE="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_VERSION/llama.cpp-$LLAMA_VERSION-bin-linux-x64.zip"
+        FILE_NAME="llama-$LLAMA_VERSION-bin-ubuntu-x64.tar.gz"
         ;;
     linux-cuda)
         LIB_NAME="libllama.so"
-        URL_BASE="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_VERSION/llama.cpp-$LLAMA_VERSION-bin-linux-cuda-x64.zip"
+        FILE_NAME="llama-$LLAMA_VERSION-bin-ubuntu-cuda-x64.tar.gz"
         ;;
     darwin-metal)
         LIB_NAME="libllama.dylib"
-        URL_BASE="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_VERSION/llama.cpp-$LLAMA_VERSION-bin-macos-x64.zip"
+        FILE_NAME="llama-$LLAMA_VERSION-bin-macos-arm64.tar.gz"
         ;;
     *)
         LIB_NAME="libllama.so"
-        URL_BASE="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_VERSION/llama.cpp-$LLAMA_VERSION-bin-linux-x64.zip"
+        FILE_NAME="llama-$LLAMA_VERSION-bin-ubuntu-x64.tar.gz"
         ;;
 esac
 
+URL_BASE="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_VERSION/$FILE_NAME"
+
+echo "   Downloading: $FILE_NAME"
+
 # Download and extract llama.cpp
-TEMP_ZIP="/tmp/llama-cpp.zip"
-curl -L -o "$TEMP_ZIP" "$URL_BASE"
-unzip -o "$TEMP_ZIP" -d "$LIB_DIR"
+TEMP_ARCHIVE="/tmp/llama-cpp.tar.gz"
+curl -L -o "$TEMP_ARCHIVE" "$URL_BASE"
+tar -xzf "$TEMP_ARCHIVE" -C "$LIB_DIR"
 
 # Verify library exists
 if [ ! -f "$LIB_DIR/$LIB_NAME" ]; then
-    # Try to find and move the library
+    # Try to find and move the library from subdirectory
     find "$LIB_DIR" -name "$LIB_NAME" -exec mv {} "$LIB_DIR/" \; 2>/dev/null || true
 fi
 

@@ -26,12 +26,15 @@ if ($LlamaVersion -eq "latest") {
     Write-Host "   Latest version: $LlamaVersion"
 }
 
-# Download and extract llama.cpp
+# Download and extract llama.cpp (new format: llama-VERSION-bin-win-cpu-x64.zip)
 Write-Host ""
 Write-Host "📥 Downloading llama.cpp binaries..."
 
-$UrlBase = "https://github.com/ggml-org/llama.cpp/releases/download/$LlamaVersion/llama.cpp-$LlamaVersion-bin-win-x64.zip"
+$FileName = "llama-$LlamaVersion-bin-win-cpu-x64.zip"
+$UrlBase = "https://github.com/ggml-org/llama.cpp/releases/download/$LlamaVersion/$FileName"
 $TempZip = "$env:TEMP\llama-cpp.zip"
+
+Write-Host "   Downloading: $FileName"
 
 Invoke-WebRequest -Uri $UrlBase -OutFile $TempZip
 Expand-Archive -Path $TempZip -DestinationPath $LibDir -Force
