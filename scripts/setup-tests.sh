@@ -125,11 +125,36 @@ TEMP_ARCHIVE="/tmp/llama-cpp.tar.gz"
 curl -L -o "$TEMP_ARCHIVE" "$URL_BASE"
 tar -xzf "$TEMP_ARCHIVE" -C "$LIB_DIR"
 
-# Verify library exists
-if [ ! -f "$LIB_DIR/$LIB_NAME" ]; then
-    # Try to find and move the library from subdirectory
-    find "$LIB_DIR" -name "$LIB_NAME" -exec mv {} "$LIB_DIR/" \; 2>/dev/null || true
+# List extracted contents for debugging
+echo "   Extracted contents:"
+ls -la "$LIB_DIR"
+
+# Find and move all required libraries to the root of LIB_DIR
+# llama.cpp now uses libllama.so as the main library
+for lib in libllama.so libggml.so libggml-base.so libggml-cpu.so; do
+    if [ ! -f "$LIB_DIR/$lib" ]; then
+        found=$(find "$LIB_DIR" -name "$lib" 2>/dev/null | head -1)
+        if [ -n "$found" ]; then
+            mv "$found" "$LIB_DIR/"
+            echo "   Moved $lib to $LIB_DIR/"
+        fi
+    fi
+done
+
+# Verify main library exists
+if [ ! -f "$LIB_DIR/libllama.so" ]; then
+    echo "   ❌ Error: libllama.so not found"
+    exit 1
 fi
+
+# Create symlinks for backward compatibility (llamalib expects ggml, ggml-base, llama)
+# New llama.cpp releases combine all into libllama.so
+for link in libggml.so libggml-base.so; do
+    if [ ! -f "$LIB_DIR/$link" ] && [ ! -L "$LIB_DIR/$link" ]; then
+        ln -sf libllama.so "$LIB_DIR/$link"
+        echo "   Created symlink: $link -> libllama.so"
+    fi
+done
 
 echo "✅ llama.cpp binaries installed"
 
