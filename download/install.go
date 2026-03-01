@@ -117,8 +117,16 @@ func upgradeInstall(libPath string, processor Processor, version string) error {
 }
 
 func installLlamaCpp(libPath string, processor Processor, version string) error {
+	// Clean contents of libPath but don't remove the directory itself
+	// This ensures the directory exists for subsequent operations
 	if _, err := os.Stat(libPath); !os.IsNotExist(err) {
-		os.RemoveAll(libPath)
+		// Remove contents but keep the directory
+		entries, err := os.ReadDir(libPath)
+		if err == nil {
+			for _, entry := range entries {
+				os.RemoveAll(filepath.Join(libPath, entry.Name()))
+			}
+		}
 	}
 
 	if err := Get(runtime.GOARCH, runtime.GOOS, processor.String(), version, libPath); err != nil {
