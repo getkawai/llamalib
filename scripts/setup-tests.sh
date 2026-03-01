@@ -62,15 +62,18 @@ fi
 # Build download URL based on platform (new format: llama-VERSION-bin-OS-ARCH.tar.gz)
 case "$OS-$PROCESSOR" in
     linux-cpu)
-        LIB_NAME="libllama.so"
+        LIB_NAME="libllama"
+        LIB_EXT=".so"
         FILE_NAME="llama-$LLAMA_VERSION-bin-ubuntu-x64.tar.gz"
         ;;
     linux-cuda)
-        LIB_NAME="libllama.so"
+        LIB_NAME="libllama"
+        LIB_EXT=".so"
         FILE_NAME="llama-$LLAMA_VERSION-bin-ubuntu-cuda-x64.tar.gz"
         ;;
     darwin-metal)
-        LIB_NAME="libllama.dylib"
+        LIB_NAME="libllama"
+        LIB_EXT=".dylib"
         # Detect architecture for macOS
         if [ "$ARCH" = "arm64" ]; then
             FILE_NAME="llama-$LLAMA_VERSION-bin-macos-arm64.tar.gz"
@@ -79,7 +82,8 @@ case "$OS-$PROCESSOR" in
         fi
         ;;
     *)
-        LIB_NAME="libllama.so"
+        LIB_NAME="libllama"
+        LIB_EXT=".so"
         FILE_NAME="llama-$LLAMA_VERSION-bin-ubuntu-x64.tar.gz"
         ;;
 esac
@@ -101,8 +105,8 @@ echo "   Extracted contents:"
 ls -la "$LIB_DIR"
 
 # Find and move all required libraries to the root of LIB_DIR
-# llama.cpp now uses libllama.so as the main library
-for lib in libllama.so libggml.so libggml-base.so libggml-cpu.so; do
+# llama.cpp now uses libllama.so/libllama.dylib as the main library
+for lib in "${LIB_NAME}${LIB_EXT}" "libggml${LIB_EXT}" "libggml-base${LIB_EXT}" "libggml-cpu${LIB_EXT}"; do
     if [ ! -f "$LIB_DIR/$lib" ]; then
         found=$(find "$LIB_DIR" -name "$lib" 2>/dev/null | head -1)
         if [ -n "$found" ]; then
@@ -113,17 +117,17 @@ for lib in libllama.so libggml.so libggml-base.so libggml-cpu.so; do
 done
 
 # Verify main library exists
-if [ ! -f "$LIB_DIR/libllama.so" ]; then
-    echo "   ❌ Error: libllama.so not found"
+if [ ! -f "$LIB_DIR/${LIB_NAME}${LIB_EXT}" ]; then
+    echo "   ❌ Error: ${LIB_NAME}${LIB_EXT} not found"
     exit 1
 fi
 
 # Create symlinks for backward compatibility (llamalib expects ggml, ggml-base, llama)
-# New llama.cpp releases combine all into libllama.so
-for link in libggml.so libggml-base.so; do
+# New llama.cpp releases combine all into libllama.so/libllama.dylib
+for link in "libggml${LIB_EXT}" "libggml-base${LIB_EXT}"; do
     if [ ! -f "$LIB_DIR/$link" ] && [ ! -L "$LIB_DIR/$link" ]; then
-        ln -sf libllama.so "$LIB_DIR/$link"
-        echo "   Created symlink: $link -> libllama.so"
+        ln -sf "${LIB_NAME}${LIB_EXT}" "$LIB_DIR/$link"
+        echo "   Created symlink: $link -> ${LIB_NAME}${LIB_EXT}"
     fi
 done
 
