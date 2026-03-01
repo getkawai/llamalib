@@ -104,20 +104,22 @@ tar -xzf "$TEMP_ARCHIVE" -C "$LIB_DIR"
 echo "   Extracted contents:"
 ls -la "$LIB_DIR"
 
-# Find and move all required libraries to the root of LIB_DIR
-# llama.cpp now uses libllama.so/libllama.dylib as the main library
-for lib in "${LIB_NAME}${LIB_EXT}" "libggml${LIB_EXT}" "libggml-base${LIB_EXT}" "libggml-cpu${LIB_EXT}"; do
-    if [ ! -f "$LIB_DIR/$lib" ]; then
-        found=$(find "$LIB_DIR" -name "$lib" 2>/dev/null | head -1)
-        if [ -n "$found" ]; then
-            mv "$found" "$LIB_DIR/"
-            echo "   Moved $lib to $LIB_DIR/"
+# Find the extracted subdirectory (e.g., llama-b8182)
+EXTRACTED_SUBDIR=$(find "$LIB_DIR" -maxdepth 1 -type d -name "llama-*" | head -1)
+if [ -n "$EXTRACTED_SUBDIR" ] && [ "$EXTRACTED_SUBDIR" != "$LIB_DIR" ]; then
+    echo "   Found extracted directory: $EXTRACTED_SUBDIR"
+    
+    # Copy all required libraries (including versioned .so files)
+    for lib in "${LIB_NAME}${LIB_EXT}" "${LIB_NAME}${LIB_EXT}."* "libggml${LIB_EXT}" "libggml${LIB_EXT}."* "libggml-base${LIB_EXT}" "libggml-base${LIB_EXT}."* "libggml-cpu${LIB_EXT}" "libggml-cpu${LIB_EXT}."*; do
+        if [ -f "$EXTRACTED_SUBDIR/$lib" ]; then
+            cp "$EXTRACTED_SUBDIR/$lib" "$LIB_DIR/"
+            echo "   Copied $lib to $LIB_DIR/"
         fi
-    fi
-done
+    done
+fi
 
 # Verify main library exists
-if [ ! -f "$LIB_DIR/${LIB_NAME}${LIB_EXT}" ]; then
+if [ ! -f "$LIB_DIR/${LIB_NAME}${LIB_EXT}" ] && [ ! -L "$LIB_DIR/${LIB_NAME}${LIB_EXT}" ]; then
     echo "   ❌ Error: ${LIB_NAME}${LIB_EXT} not found"
     exit 1
 fi

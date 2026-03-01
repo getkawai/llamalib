@@ -3,8 +3,8 @@ package llama
 import (
 	"unsafe"
 
-	"github.com/jupiterrider/ffi"
 	"github.com/getkawai/llamalib/utils"
+	"github.com/jupiterrider/ffi"
 )
 
 var (
@@ -483,52 +483,6 @@ func Tokenize(vocab Vocab, text string, addSpecial bool, parseSpecial bool) []To
 	return tokens
 }
 
-// VocabGetAttr retrieves the attribute of a given token in the vocabulary.
-func VocabGetAttr(vocab Vocab, token Token) TokenAttr {
-	if vocab == 0 {
-		return TokenAttrUnknown
-	}
-	var attr ffi.Arg
-	vocabGetAttrFunc.Call(unsafe.Pointer(&attr), unsafe.Pointer(&vocab), unsafe.Pointer(&token))
-	return TokenAttr(int32(attr))
-}
-
-// VocabGetScore retrieves the score of a given token in the vocabulary.
-func VocabGetScore(vocab Vocab, token Token) float32 {
-	if vocab == 0 {
-		return 0.0
-	}
-	var score ffi.Arg
-	vocabGetScoreFunc.Call(unsafe.Pointer(&score), unsafe.Pointer(&vocab), unsafe.Pointer(&token))
-	return float32(score)
-}
-
-// VocabGetText retrieves the text representation of a given token in the vocabulary.
-func VocabGetText(vocab Vocab, token Token) string {
-	if vocab == 0 {
-		return ""
-	}
-	var textPtr *byte
-	vocabGetTextFunc.Call(unsafe.Pointer(&textPtr), unsafe.Pointer(&vocab), unsafe.Pointer(&token))
-
-	if textPtr == nil {
-		return ""
-	}
-
-	return utils.BytePtrToString(textPtr)
-}
-
-// GetVocabType retrieves the type of the vocabulary.
-func GetVocabType(vocab Vocab) VocabType {
-	if vocab == 0 {
-		return VocabTypeNone
-	}
-	var vocabType ffi.Arg
-	vocabTypeFunc.Call(unsafe.Pointer(&vocabType), unsafe.Pointer(&vocab))
-
-	return VocabType(int32(vocabType))
-}
-
 // Detokenize converts a sequence of tokens into text using the specified vocabulary.
 // The `removeSpecial` parameter indicates whether to remove special tokens, and the `unparseSpecial` parameter
 // specifies whether to render special tokens in the output.
@@ -579,4 +533,50 @@ func Detokenize(vocab Vocab, tokens []Token, removeSpecial bool, unparseSpecial 
 	}
 
 	return string(buf[:actualSize])
+}
+
+// VocabGetAttr retrieves the attribute of a given token in the vocabulary.
+func VocabGetAttr(vocab Vocab, token Token) TokenAttr {
+	if vocab == 0 {
+		return TokenAttrUnknown
+	}
+	var attr ffi.Arg
+	vocabGetAttrFunc.Call(unsafe.Pointer(&attr), unsafe.Pointer(&vocab), unsafe.Pointer(&token))
+	return TokenAttr(int32(attr))
+}
+
+// VocabGetScore retrieves the score of a given token in the vocabulary.
+func VocabGetScore(vocab Vocab, token Token) float32 {
+	if vocab == 0 {
+		return 0.0
+	}
+	var score ffi.Arg
+	vocabGetScoreFunc.Call(unsafe.Pointer(&score), unsafe.Pointer(&vocab), unsafe.Pointer(&token))
+	return float32(score)
+}
+
+// VocabGetText retrieves the text representation of a given token in the vocabulary.
+func VocabGetText(vocab Vocab, token Token) string {
+	if vocab == 0 {
+		return ""
+	}
+	var textPtr *byte
+	vocabGetTextFunc.Call(unsafe.Pointer(&textPtr), unsafe.Pointer(&vocab), unsafe.Pointer(&token))
+
+	if textPtr == nil {
+		return ""
+	}
+
+	return utils.BytePtrToString(textPtr)
+}
+
+// GetVocabType retrieves the type of the vocabulary.
+func GetVocabType(vocab Vocab) VocabType {
+	if vocab == 0 {
+		return VocabTypeNone
+	}
+	var vocabType ffi.Arg
+	vocabTypeFunc.Call(unsafe.Pointer(&vocabType), unsafe.Pointer(&vocab))
+
+	return VocabType(int32(vocabType))
 }

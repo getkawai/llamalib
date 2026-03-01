@@ -1,10 +1,11 @@
 package llama
 
 import (
+	"math"
 	"unsafe"
 
-	"github.com/jupiterrider/ffi"
 	"github.com/getkawai/llamalib/utils"
+	"github.com/jupiterrider/ffi"
 )
 
 type SamplerType int32
@@ -21,14 +22,13 @@ const (
 	SamplerTypeInfill                  = 9
 	SamplerTypePenalties               = 10
 	SamplerTypeTopNSigma               = 11
-	SamplerTypeLogitBias               = 12
+	SamplerTypeAdaptiveP               = 12
+	SamplerTypeLogitBias               = 13
 )
 
-type Sampler uintptr
-
 var (
-	// FFITypeSamplerChainParams represents the C struct llama_sampler_chain_params
-	FFISamplerChainParams = ffi.NewType(&ffi.TypePointer)
+	// ffiSamplerChainParams represents the C struct llama_sampler_chain_params
+	ffiSamplerChainParams = ffi.NewType(&ffi.TypePointer)
 )
 
 var (
@@ -38,8 +38,20 @@ var (
 	// LLAMA_API struct llama_sampler * llama_sampler_chain_init(struct llama_sampler_chain_params params);
 	samplerChainInitFunc ffi.Fun
 
+	// LLAMA_API const char * llama_sampler_name(const struct llama_sampler * smpl);
+	samplerNameFunc ffi.Fun
+
 	// LLAMA_API void llama_sampler_chain_add(struct llama_sampler * chain, struct llama_sampler * smpl);
 	samplerChainAddFunc ffi.Fun
+
+	// LLAMA_API struct llama_sampler * llama_sampler_chain_get(struct llama_sampler * chain, int32_t i);
+	samplerChainGetFunc ffi.Fun
+
+	// LLAMA_API int llama_sampler_chain_n(const struct llama_sampler * chain);
+	samplerChainNFunc ffi.Fun
+
+	// LLAMA_API struct llama_sampler * llama_sampler_chain_remove(struct llama_sampler * chain, int32_t i);
+	samplerChainRemoveFunc ffi.Fun
 
 	// LLAMA_API struct llama_sampler * llama_sampler_init_greedy(void);
 	samplerInitGreedyFunc ffi.Fun
@@ -98,32 +110,73 @@ var (
 	//               	const char * grammar_root);
 	samplerInitGrammarFunc ffi.Fun
 
+	// LLAMA_API struct llama_sampler * llama_sampler_init_grammar_lazy_patterns(
+	//   const struct llama_vocab * vocab,
+	//   const char * grammar_str,
+	//   const char * grammar_root,
+	//   const char ** trigger_patterns,
+	//   size_t num_trigger_patterns,
+	//   const llama_token * trigger_tokens,
+	//   size_t num_trigger_tokens);
+	samplerInitGrammarLazyPatternsFunc ffi.Fun
+
+	// LLAMA_API struct llama_sampler * llama_sampler_init_adaptive_p(
+	//                            float   target,
+	//                            float   decay,
+	//                         uint32_t   seed);
+	samplerInitAdaptivePFunc ffi.Fun
+
+	// LLAMA_API struct llama_sampler * llama_sampler_init_infill(const struct llama_vocab * vocab);
+	samplerInitInfillFunc ffi.Fun
+
 	// LLAMA_API llama_token llama_sampler_sample(struct llama_sampler * smpl, struct llama_context * ctx, int32_t idx);
 	samplerSampleFunc ffi.Fun
 
 	// LLAMA_API void  llama_sampler_accept(struct llama_sampler * smpl, llama_token token);
 	samplerAcceptFunc ffi.Fun
 
+	// LLAMA_API void  llama_sampler_apply (struct llama_sampler * smpl, llama_token_data_array * cur_p);
+	samplerApplyFunc ffi.Fun
+
 	// LLAMA_API void llama_sampler_free  (struct llama_sampler * smpl);
 	samplerFreeFunc ffi.Fun
 
 	// LLAMA_API void llama_sampler_reset (struct llama_sampler * smpl);
 	samplerResetFunc ffi.Fun
+
+	// LLAMA_API struct llama_sampler * llama_sampler_clone(const struct llama_sampler * smpl);
+	samplerCloneFunc ffi.Fun
 )
 
 func loadSamplingFuncs(lib ffi.Lib) error {
 	var err error
 
-	if samplerChainDefaultParamsFunc, err = lib.Prep("llama_sampler_chain_default_params", &FFISamplerChainParams); err != nil {
+	if samplerChainDefaultParamsFunc, err = lib.Prep("llama_sampler_chain_default_params", &ffiSamplerChainParams); err != nil {
 		return loadError("llama_sampler_chain_default_params", err)
 	}
 
-	if samplerChainInitFunc, err = lib.Prep("llama_sampler_chain_init", &ffi.TypePointer, &FFISamplerChainParams); err != nil {
+	if samplerChainInitFunc, err = lib.Prep("llama_sampler_chain_init", &ffi.TypePointer, &ffiSamplerChainParams); err != nil {
 		return loadError("llama_sampler_chain_init", err)
+	}
+
+	if samplerNameFunc, err = lib.Prep("llama_sampler_name", &ffi.TypePointer, &ffi.TypePointer); err != nil {
+		return loadError("llama_sampler_name", err)
 	}
 
 	if samplerChainAddFunc, err = lib.Prep("llama_sampler_chain_add", &ffi.TypeVoid, &ffi.TypePointer, &ffi.TypePointer); err != nil {
 		return loadError("llama_sampler_chain_add", err)
+	}
+
+	if samplerChainGetFunc, err = lib.Prep("llama_sampler_chain_get", &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeSint32); err != nil {
+		return loadError("llama_sampler_chain_get", err)
+	}
+
+	if samplerChainNFunc, err = lib.Prep("llama_sampler_chain_n", &ffi.TypeSint32, &ffi.TypePointer); err != nil {
+		return loadError("llama_sampler_chain_n", err)
+	}
+
+	if samplerChainRemoveFunc, err = lib.Prep("llama_sampler_chain_remove", &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeSint32); err != nil {
+		return loadError("llama_sampler_chain_remove", err)
 	}
 
 	if samplerInitGreedyFunc, err = lib.Prep("llama_sampler_init_greedy", &ffi.TypePointer); err != nil {
@@ -143,7 +196,7 @@ func loadSamplingFuncs(lib ffi.Lib) error {
 	}
 
 	if samplerInitDryFunc, err = lib.Prep("llama_sampler_init_dry", &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeSint32, &ffi.TypeFloat, &ffi.TypeFloat,
-		&ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypeUint64); err != nil {
+		&ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypePointer, &ffiTypeSize); err != nil {
 
 		return loadError("llama_sampler_init_dry", err)
 	}
@@ -156,19 +209,19 @@ func loadSamplingFuncs(lib ffi.Lib) error {
 		return loadError("llama_sampler_init_top_k", err)
 	}
 
-	if samplerInitTypicalFunc, err = lib.Prep("llama_sampler_init_typical", &ffi.TypePointer, &ffi.TypeFloat, &ffi.TypeUint32); err != nil {
+	if samplerInitTypicalFunc, err = lib.Prep("llama_sampler_init_typical", &ffi.TypePointer, &ffi.TypeFloat, &ffiTypeSize); err != nil {
 		return loadError("llama_sampler_init_typical", err)
 	}
 
-	if samplerInitTopPFunc, err = lib.Prep("llama_sampler_init_top_p", &ffi.TypePointer, &ffi.TypeFloat, &ffi.TypeUint32); err != nil {
+	if samplerInitTopPFunc, err = lib.Prep("llama_sampler_init_top_p", &ffi.TypePointer, &ffi.TypeFloat, &ffiTypeSize); err != nil {
 		return loadError("llama_sampler_init_top_p", err)
 	}
 
-	if samplerInitMinPFunc, err = lib.Prep("llama_sampler_init_min_p", &ffi.TypePointer, &ffi.TypeFloat, &ffi.TypeUint32); err != nil {
+	if samplerInitMinPFunc, err = lib.Prep("llama_sampler_init_min_p", &ffi.TypePointer, &ffi.TypeFloat, &ffiTypeSize); err != nil {
 		return loadError("llama_sampler_init_min_p", err)
 	}
 
-	if samplerInitXTCFunc, err = lib.Prep("llama_sampler_init_xtc", &ffi.TypePointer, &ffi.TypeFloat, &ffi.TypeFloat, &ffi.TypeUint32, &ffi.TypeUint32); err != nil {
+	if samplerInitXTCFunc, err = lib.Prep("llama_sampler_init_xtc", &ffi.TypePointer, &ffi.TypeFloat, &ffi.TypeFloat, &ffiTypeSize, &ffi.TypeUint32); err != nil {
 		return loadError("llama_sampler_init_xtc", err)
 	}
 
@@ -180,6 +233,27 @@ func loadSamplingFuncs(lib ffi.Lib) error {
 		return loadError("llama_sampler_init_grammar", err)
 	}
 
+	if samplerInitGrammarLazyPatternsFunc, err = lib.Prep("llama_sampler_init_grammar_lazy_patterns",
+		&ffi.TypePointer, // return: struct llama_sampler *
+		&ffi.TypePointer, // vocab
+		&ffi.TypePointer, // grammar_str
+		&ffi.TypePointer, // grammar_root
+		&ffi.TypePointer, // trigger_patterns
+		&ffiTypeSize,     // num_trigger_patterns
+		&ffi.TypePointer, // trigger_tokens
+		&ffiTypeSize,     // num_trigger_tokens
+	); err != nil {
+		return loadError("llama_sampler_init_grammar_lazy_patterns", err)
+	}
+
+	if samplerInitAdaptivePFunc, err = lib.Prep("llama_sampler_init_adaptive_p", &ffi.TypePointer, &ffi.TypeFloat, &ffi.TypeFloat, &ffiTypeSize); err != nil {
+		return loadError("llama_sampler_init_adaptive_p", err)
+	}
+
+	if samplerInitInfillFunc, err = lib.Prep("llama_sampler_init_infill", &ffi.TypePointer, &ffi.TypePointer); err != nil {
+		return loadError("llama_sampler_init_infill", err)
+	}
+
 	if samplerSampleFunc, err = lib.Prep("llama_sampler_sample", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeSint32); err != nil {
 		return loadError("llama_sampler_sample", err)
 	}
@@ -188,12 +262,20 @@ func loadSamplingFuncs(lib ffi.Lib) error {
 		return loadError("llama_sampler_accept", err)
 	}
 
+	if samplerApplyFunc, err = lib.Prep("llama_sampler_apply", &ffi.TypeVoid, &ffi.TypePointer, &ffi.TypePointer); err != nil {
+		return loadError("llama_sampler_apply", err)
+	}
+
 	if samplerFreeFunc, err = lib.Prep("llama_sampler_free", &ffi.TypeVoid, &ffi.TypePointer); err != nil {
 		return loadError("llama_sampler_free", err)
 	}
 
 	if samplerResetFunc, err = lib.Prep("llama_sampler_reset", &ffi.TypeVoid, &ffi.TypePointer); err != nil {
 		return loadError("llama_sampler_reset", err)
+	}
+
+	if samplerCloneFunc, err = lib.Prep("llama_sampler_clone", &ffi.TypePointer, &ffi.TypePointer); err != nil {
+		return loadError("llama_sampler_clone", err)
 	}
 
 	return nil
@@ -215,12 +297,58 @@ func SamplerChainInit(params SamplerChainParams) Sampler {
 	return p
 }
 
+// SamplerName returns the name of the sampler as a string.
+func SamplerName(smpl Sampler) string {
+	if smpl == 0 {
+		return ""
+	}
+	var ptr *byte
+	samplerNameFunc.Call(unsafe.Pointer(&ptr), unsafe.Pointer(&smpl))
+	if ptr == nil {
+		return ""
+	}
+
+	return utils.BytePtrToString(ptr)
+}
+
 // SamplerChainAdd adds a sampler to a sampling chain.
 func SamplerChainAdd(chain Sampler, smpl Sampler) {
 	if chain == 0 || smpl == 0 {
 		return
 	}
 	samplerChainAddFunc.Call(nil, unsafe.Pointer(&chain), unsafe.Pointer(&smpl))
+}
+
+// SamplerChainGet returns the i-th sampler from a sampler chain, or the chain itself if i == -1.
+// Returns 0 if the chain is not valid or index is out of bounds.
+func SamplerChainGet(chain Sampler, i int32) Sampler {
+	if chain == 0 {
+		return 0
+	}
+	var s Sampler
+	samplerChainGetFunc.Call(unsafe.Pointer(&s), unsafe.Pointer(&chain), &i)
+	return s
+}
+
+// SamplerChainN returns the total number of samplers in the chain.
+func SamplerChainN(chain Sampler) int {
+	if chain == 0 {
+		return 0
+	}
+	var n ffi.Arg
+	samplerChainNFunc.Call(unsafe.Pointer(&n), unsafe.Pointer(&chain))
+	return int(n)
+}
+
+// SamplerChainRemove removes the i-th sampler from the chain and returns it.
+// After removal, the chain will no longer own the sampler, and it will not be freed when the chain is freed.
+func SamplerChainRemove(chain Sampler, i int32) Sampler {
+	if chain == 0 {
+		return 0
+	}
+	var removed Sampler
+	samplerChainRemoveFunc.Call(unsafe.Pointer(&removed), unsafe.Pointer(&chain), &i)
+	return removed
 }
 
 // SamplerInitGreedy initializes a new greedy sampler.
@@ -234,7 +362,7 @@ func SamplerInitGreedy() Sampler {
 // SamplerInitDist initializes a new distribution sampler with the specified seed.
 func SamplerInitDist(seed uint32) Sampler {
 	var p Sampler
-	samplerInitDistFunc.Call(unsafe.Pointer(&p), unsafe.Pointer(&seed))
+	samplerInitDistFunc.Call(unsafe.Pointer(&p), &seed)
 
 	return p
 }
@@ -242,7 +370,7 @@ func SamplerInitDist(seed uint32) Sampler {
 // SamplerInitLogitBias initializes a new logit bias sampler.
 func SamplerInitLogitBias(nVocab int32, nLogitBias int32, logitBias *LogitBias) Sampler {
 	var p Sampler
-	samplerInitLogitBiasFunc.Call(unsafe.Pointer(&p), unsafe.Pointer(&nVocab), unsafe.Pointer(&nLogitBias), unsafe.Pointer(&logitBias))
+	samplerInitLogitBiasFunc.Call(unsafe.Pointer(&p), &nVocab, &nLogitBias, unsafe.Pointer(&logitBias))
 
 	return p
 }
@@ -250,7 +378,7 @@ func SamplerInitLogitBias(nVocab int32, nLogitBias int32, logitBias *LogitBias) 
 // SamplerInitPenalties initializes a new penalties sampler.
 func SamplerInitPenalties(lastN int32, repeat float32, freq float32, present float32) Sampler {
 	var p Sampler
-	samplerInitPenaltiesFunc.Call(unsafe.Pointer(&p), unsafe.Pointer(&lastN), unsafe.Pointer(&repeat), unsafe.Pointer(&freq), unsafe.Pointer(&present))
+	samplerInitPenaltiesFunc.Call(unsafe.Pointer(&p), &lastN, &repeat, &freq, &present)
 
 	return p
 }
@@ -258,7 +386,6 @@ func SamplerInitPenalties(lastN int32, repeat float32, freq float32, present flo
 // SamplerInitDry initializes a new DRY sampler.
 func SamplerInitDry(vocab Vocab, nCtxTrain int32, multiplier float32, base float32, allowedLength int32, penaltyLast int32,
 	seqBreakers []string) Sampler {
-
 	var sp unsafe.Pointer
 	numBreakers := uint64(len(seqBreakers))
 	if numBreakers > 0 {
@@ -274,16 +401,15 @@ func SamplerInitDry(vocab Vocab, nCtxTrain int32, multiplier float32, base float
 	}
 
 	var p Sampler
-	samplerInitDryFunc.Call(unsafe.Pointer(&p), unsafe.Pointer(&vocab), unsafe.Pointer(&nCtxTrain), unsafe.Pointer(&multiplier), unsafe.Pointer(&base), unsafe.Pointer(&allowedLength), unsafe.Pointer(&penaltyLast),
+	samplerInitDryFunc.Call(unsafe.Pointer(&p), unsafe.Pointer(&vocab), &nCtxTrain, &multiplier, &base, &allowedLength, &penaltyLast,
 		&sp, &numBreakers)
-
 	return p
 }
 
 // SamplerInitTopNSigma initializes a new Top-N Sigma sampler.
 func SamplerInitTopNSigma(n float32) Sampler {
 	var p Sampler
-	samplerInitTopNSigmaFunc.Call(unsafe.Pointer(&p), unsafe.Pointer(&n))
+	samplerInitTopNSigmaFunc.Call(unsafe.Pointer(&p), &n)
 
 	return p
 }
@@ -291,7 +417,7 @@ func SamplerInitTopNSigma(n float32) Sampler {
 // SamplerInitTopK initializes a new Top-K sampler.
 func SamplerInitTopK(k int32) Sampler {
 	var p Sampler
-	samplerInitTopKFunc.Call(unsafe.Pointer(&p), unsafe.Pointer(&k))
+	samplerInitTopKFunc.Call(unsafe.Pointer(&p), &k)
 
 	return p
 }
@@ -299,7 +425,7 @@ func SamplerInitTopK(k int32) Sampler {
 // SamplerInitTypical initializes a new Typical-P sampler.
 func SamplerInitTypical(p float32, keep uint32) Sampler {
 	var s Sampler
-	samplerInitTypicalFunc.Call(unsafe.Pointer(&s), unsafe.Pointer(&p), unsafe.Pointer(&keep))
+	samplerInitTypicalFunc.Call(unsafe.Pointer(&s), &p, &keep)
 
 	return s
 }
@@ -307,7 +433,7 @@ func SamplerInitTypical(p float32, keep uint32) Sampler {
 // SamplerInitTopP initializes a new Top-P sampler.
 func SamplerInitTopP(p float32, keep uint32) Sampler {
 	var s Sampler
-	samplerInitTopPFunc.Call(unsafe.Pointer(&s), unsafe.Pointer(&p), unsafe.Pointer(&keep))
+	samplerInitTopPFunc.Call(unsafe.Pointer(&s), &p, &keep)
 
 	return s
 }
@@ -315,7 +441,7 @@ func SamplerInitTopP(p float32, keep uint32) Sampler {
 // SamplerInitMinP initializes a new Min-P sampler.
 func SamplerInitMinP(p float32, keep uint32) Sampler {
 	var s Sampler
-	samplerInitMinPFunc.Call(unsafe.Pointer(&s), unsafe.Pointer(&p), unsafe.Pointer(&keep))
+	samplerInitMinPFunc.Call(unsafe.Pointer(&s), &p, &keep)
 
 	return s
 }
@@ -323,7 +449,7 @@ func SamplerInitMinP(p float32, keep uint32) Sampler {
 // SamplerInitXTC initializes a new XTC sampler.
 func SamplerInitXTC(p float32, t float32, minKeep uint32, seed uint32) Sampler {
 	var s Sampler
-	samplerInitXTCFunc.Call(unsafe.Pointer(&s), unsafe.Pointer(&p), unsafe.Pointer(&t), unsafe.Pointer(&minKeep), unsafe.Pointer(&seed))
+	samplerInitXTCFunc.Call(unsafe.Pointer(&s), &p, &t, &minKeep, &seed)
 
 	return s
 }
@@ -331,7 +457,7 @@ func SamplerInitXTC(p float32, t float32, minKeep uint32, seed uint32) Sampler {
 // SamplerInitTempExt initializes a new Temperature Extended sampler.
 func SamplerInitTempExt(t float32, delta float32, exponent float32) Sampler {
 	var s Sampler
-	samplerInitTempExtFunc.Call(unsafe.Pointer(&s), unsafe.Pointer(&t), unsafe.Pointer(&delta), unsafe.Pointer(&exponent))
+	samplerInitTempExtFunc.Call(unsafe.Pointer(&s), &t, &delta, &exponent)
 
 	return s
 }
@@ -350,6 +476,69 @@ func SamplerInitGrammar(vocab Vocab, grammar, root string) Sampler {
 	return s
 }
 
+// SamplerInitGrammarLazyPatterns initializes a lazy grammar sampler with trigger patterns and tokens.
+func SamplerInitGrammarLazyPatterns(
+	vocab Vocab,
+	grammar, root string,
+	triggerPatterns []string,
+	triggerTokens []Token,
+) Sampler {
+	var s Sampler
+	if vocab == 0 {
+		return s
+	}
+	grmr, _ := utils.BytePtrFromString(grammar)
+	r, _ := utils.BytePtrFromString(root)
+
+	var tp unsafe.Pointer
+	numPatterns := uint64(len(triggerPatterns))
+	if numPatterns > 0 {
+		ptrs := make([]*byte, 0, numPatterns)
+		for _, pat := range triggerPatterns {
+			ptr, err := utils.BytePtrFromString(pat)
+			if err != nil {
+				return s
+			}
+			ptrs = append(ptrs, ptr)
+		}
+		tp = unsafe.Pointer(&ptrs[0])
+	}
+
+	var tt unsafe.Pointer
+	numTokens := uint64(len(triggerTokens))
+	if numTokens > 0 {
+		tt = unsafe.Pointer(&triggerTokens[0])
+	}
+
+	samplerInitGrammarLazyPatternsFunc.Call(
+		unsafe.Pointer(&s),
+		unsafe.Pointer(&vocab),
+		unsafe.Pointer(&grmr),
+		unsafe.Pointer(&r),
+		&tp,
+		&numPatterns,
+		&tt,
+		&numTokens,
+	)
+	return s
+}
+
+// SamplerInitAdaptiveP initializes a new Adaptive-P sampler.
+func SamplerInitAdaptiveP(target float32, decay float32, seed uint32) Sampler {
+	var s Sampler
+	samplerInitAdaptivePFunc.Call(unsafe.Pointer(&s), &target, &decay, &seed)
+
+	return s
+}
+
+// SamplerInitInfill initializes a new infill sampler for fill-in-the-middle infilling.
+// Supposed to be used after top_k + top_p sampling.
+func SamplerInitInfill(vocab Vocab) Sampler {
+	var s Sampler
+	samplerInitInfillFunc.Call(unsafe.Pointer(&s), unsafe.Pointer(&vocab))
+	return s
+}
+
 // SamplerSample samples a token from the sampler given the context and index.
 func SamplerSample(smpl Sampler, ctx Context, idx int32) Token {
 	if smpl == 0 || ctx == 0 {
@@ -357,7 +546,7 @@ func SamplerSample(smpl Sampler, ctx Context, idx int32) Token {
 	}
 
 	var result ffi.Arg
-	samplerSampleFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&smpl), unsafe.Pointer(&ctx), unsafe.Pointer(&idx))
+	samplerSampleFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&smpl), unsafe.Pointer(&ctx), &idx)
 
 	return Token(result)
 }
@@ -368,6 +557,14 @@ func SamplerAccept(smpl Sampler, token Token) {
 		return
 	}
 	samplerAcceptFunc.Call(nil, unsafe.Pointer(&smpl), unsafe.Pointer(&token))
+}
+
+// SamplerApply applies the sampler to the current token data array.
+func SamplerApply(smpl Sampler, curP *TokenDataArray) {
+	if smpl == 0 || curP == nil {
+		return
+	}
+	samplerApplyFunc.Call(nil, unsafe.Pointer(&smpl), unsafe.Pointer(&curP))
 }
 
 // SamplerFree frees the sampler.
@@ -384,6 +581,16 @@ func SamplerReset(smpl Sampler) {
 		return
 	}
 	samplerResetFunc.Call(nil, unsafe.Pointer(&smpl))
+}
+
+// SamplerClone creates a clone of the given sampler.
+func SamplerClone(smpl Sampler) Sampler {
+	if smpl == 0 {
+		return 0
+	}
+	var clone Sampler
+	samplerCloneFunc.Call(unsafe.Pointer(&clone), unsafe.Pointer(&smpl))
+	return clone
 }
 
 var (
@@ -422,8 +629,7 @@ func NewSampler(model Model, samplers []SamplerType, params *SamplerParams) Samp
 	for i := int32(0); i < nTokens; i++ {
 		token := Token(i)
 		if VocabIsEOG(vocab, token) {
-			// Use large negative bias to suppress EOG tokens
-			logitBiasEOG = append(logitBiasEOG, LogitBias{Token: token, Bias: -1e9})
+			logitBiasEOG = append(logitBiasEOG, LogitBias{Token: token, Bias: math.SmallestNonzeroFloat32})
 		}
 	}
 

@@ -4,11 +4,12 @@ import (
 	"errors"
 	"unsafe"
 
+	"github.com/ebitengine/purego"
 	"github.com/jupiterrider/ffi"
 )
 
-// FFITypeContextParams represents the C struct llama_context_params
-var FFITypeContextParams = ffi.NewType(
+// ffiTypeContextParams represents the C struct llama_context_params
+var ffiTypeContextParams = ffi.NewType(
 	&ffi.TypeUint32, &ffi.TypeUint32,
 	&ffi.TypeUint32, &ffi.TypeUint32,
 	&ffi.TypeSint32, &ffi.TypeSint32,
@@ -116,14 +117,14 @@ var (
 	// LLAMA_API void llama_set_causal_attn(struct llama_context * ctx, bool causal_attn);
 	setCausalAttnFunc ffi.Fun
 
-	// LLAMA_API int32_t llama_apply_adapter_cvec(
+	// LLAMA_API int32_t llama_set_adapter_cvec(
 	//         struct llama_context * ctx,
 	//                  const float * data,
 	//                       size_t   len,
 	//                      int32_t   n_embd,
 	//                      int32_t   il_start,
 	//                      int32_t   il_end);
-	applyAdapterCvecFunc ffi.Fun
+	setAdapterCvecFunc ffi.Fun
 
 	// LLAMA_API llama_token llama_get_sampled_token_ith(struct llama_context * ctx, int32_t i);
 	getSampledTokenIthFunc ffi.Fun
@@ -153,7 +154,7 @@ var (
 func loadContextFuncs(lib ffi.Lib) error {
 	var err error
 
-	if contextDefaultParamsFunc, err = lib.Prep("llama_context_default_params", &FFITypeContextParams); err != nil {
+	if contextDefaultParamsFunc, err = lib.Prep("llama_context_default_params", &ffiTypeContextParams); err != nil {
 		return loadError("llama_context_default_params", err)
 	}
 
@@ -165,11 +166,11 @@ func loadContextFuncs(lib ffi.Lib) error {
 		return loadError("llama_set_warmup", err)
 	}
 
-	if encodeFunc, err = lib.Prep("llama_encode", &ffi.TypeSint32, &ffi.TypePointer, &FFITypeBatch); err != nil {
+	if encodeFunc, err = lib.Prep("llama_encode", &ffi.TypeSint32, &ffi.TypePointer, &ffiTypeBatch); err != nil {
 		return loadError("llama_encode", err)
 	}
 
-	if decodeFunc, err = lib.Prep("llama_decode", &ffi.TypeSint32, &ffi.TypePointer, &FFITypeBatch); err != nil {
+	if decodeFunc, err = lib.Prep("llama_decode", &ffi.TypeSint32, &ffi.TypePointer, &ffiTypeBatch); err != nil {
 		return loadError("llama_decode", err)
 	}
 
@@ -237,8 +238,8 @@ func loadContextFuncs(lib ffi.Lib) error {
 		return loadError("llama_set_causal_attn", err)
 	}
 
-	if applyAdapterCvecFunc, err = lib.Prep("llama_apply_adapter_cvec", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeUint64, &ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypeSint32); err != nil {
-		return loadError("llama_apply_adapter_cvec", err)
+	if setAdapterCvecFunc, err = lib.Prep("llama_set_adapter_cvec", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeUint64, &ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypeSint32); err != nil {
+		return loadError("llama_set_adapter_cvec", err)
 	}
 
 	if getSampledTokenIthFunc, err = lib.Prep("llama_get_sampled_token_ith", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypeSint32); err != nil {
@@ -419,7 +420,7 @@ func GetLogitsIth(ctx Context, i int32, nVocab int) ([]float32, error) {
 		return nil, errInvalidContext
 	}
 	var logitsPtr *float32
-	getLogitsIthFunc.Call(unsafe.Pointer(&logitsPtr), unsafe.Pointer(&ctx), unsafe.Pointer(&i))
+	getLogitsIthFunc.Call(unsafe.Pointer(&logitsPtr), unsafe.Pointer(&ctx), &i)
 
 	if logitsPtr == nil {
 		return nil, nil
@@ -509,30 +510,43 @@ func SetCausalAttn(ctx Context, causalAttn bool) {
 	setCausalAttnFunc.Call(nil, unsafe.Pointer(&ctx), &causalAttn)
 }
 
-// ApplyAdapterCvec applies a loaded control vector to a llama_context, or if data is nil, clear
+// SetAdapterCvec sets a loaded control vector to a llama_context, or if data is nil, clears
 // the currently loaded vector.
 // nEmbd should be the size of a single layer's control, and data should point
 // to an nEmbd x nLayers buffer starting from layer 1.
-// ilStart and ilEnd are the layer range to apply the control vector.
-// Returns 0 on success, -1 on error.
-func ApplyAdapterCvec(ctx Context, data []float32, nEmbd, ilStart, ilEnd int32) (int32, error) {
+// ilStart and ilEnd are the layer range the vector should apply to (both inclusive)
+// Returns 0 on success, or a negative value on failure.
+func SetAdapterCvec(ctx Context, data []float32, nEmbd, ilStart, ilEnd int32) int32 {
 	if ctx == 0 {
-		return -1, errInvalidContext
+		return -1
 	}
 
-	var dataPtr *float32
-	var length uint64
+	var (
+		result  ffi.Arg
+		dataPtr *float32
+		length  uint64
+	)
+
+	// If data is nil, we're clearing the vector
 	if data != nil {
 		dataPtr = unsafe.SliceData(data)
 		length = uint64(len(data))
 	}
 
-	var result ffi.Arg
-	applyAdapterCvecFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), unsafe.Pointer(&dataPtr), &length, &nEmbd, &ilStart, &ilEnd)
-	return int32(result), nil
+	setAdapterCvecFunc.Call(
+		unsafe.Pointer(&result),
+		unsafe.Pointer(&ctx),
+		unsafe.Pointer(&dataPtr),
+		&length,
+		&nEmbd,
+		&ilStart,
+		&ilEnd,
+	)
+
+	return int32(result)
 }
 
-// GetSampledTokenIth retrieves the sampled token for the ith position.
+// GetSampledTokenIth retrieves the sampled token for the ith output.
 func GetSampledTokenIth(ctx Context, i int32) (Token, error) {
 	if ctx == 0 {
 		return TokenNull, errInvalidContext
@@ -542,114 +556,95 @@ func GetSampledTokenIth(ctx Context, i int32) (Token, error) {
 	return Token(result), nil
 }
 
-// GetSampledProbsIth retrieves the sampled probabilities for the ith position.
-func GetSampledProbsIth(ctx Context, i int32) ([]float32, error) {
+// GetSampledProbsIth retrieves the sampled probabilities for the ith output.
+func GetSampledProbsIth(ctx Context, i int32, nVocab int) ([]float32, error) {
 	if ctx == 0 {
 		return nil, errInvalidContext
 	}
-
-	count := GetSampledProbsCountIth(ctx, i)
-	if count == 0 {
-		return nil, nil
-	}
-
 	var result *float32
 	getSampledProbsIthFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), &i)
 	if result == nil {
 		return nil, nil
 	}
-
-	return unsafe.Slice(result, count), nil
+	return unsafe.Slice(result, nVocab), nil
 }
 
-// GetSampledProbsCountIth retrieves the count of sampled probabilities for the ith position.
-func GetSampledProbsCountIth(ctx Context, i int32) uint32 {
+// GetSampledProbsCountIth retrieves the count of sampled probabilities for the ith output.
+func GetSampledProbsCountIth(ctx Context, i int32) (uint32, error) {
 	if ctx == 0 {
-		return 0
+		return 0, errInvalidContext
 	}
 	var result ffi.Arg
 	getSampledProbsCountIthFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), &i)
-	return uint32(result)
+	return uint32(result), nil
 }
 
-// GetSampledLogitsIth retrieves the sampled logits for the ith position.
-func GetSampledLogitsIth(ctx Context, i int32) ([]float32, error) {
+// GetSampledLogitsIth retrieves the sampled logits for the ith output.
+func GetSampledLogitsIth(ctx Context, i int32, nVocab int) ([]float32, error) {
 	if ctx == 0 {
 		return nil, errInvalidContext
 	}
-
-	count := GetSampledLogitsCountIth(ctx, i)
-	if count == 0 {
-		return nil, nil
-	}
-
 	var result *float32
 	getSampledLogitsIthFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), &i)
 	if result == nil {
 		return nil, nil
 	}
-
-	return unsafe.Slice(result, count), nil
+	return unsafe.Slice(result, nVocab), nil
 }
 
-// GetSampledLogitsCountIth retrieves the count of sampled logits for the ith position.
-func GetSampledLogitsCountIth(ctx Context, i int32) uint32 {
+// GetSampledLogitsCountIth retrieves the count of sampled logits for the ith output.
+func GetSampledLogitsCountIth(ctx Context, i int32) (uint32, error) {
 	if ctx == 0 {
-		return 0
+		return 0, errInvalidContext
 	}
 	var result ffi.Arg
 	getSampledLogitsCountIthFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), &i)
-	return uint32(result)
+	return uint32(result), nil
 }
 
-// GetSampledCandidatesIth retrieves the sampled candidates for the ith position.
-func GetSampledCandidatesIth(ctx Context, i int32) ([]Token, error) {
+// GetSampledCandidatesIth retrieves the sampled candidates for the ith output.
+func GetSampledCandidatesIth(ctx Context, i int32, nVocab int) ([]Token, error) {
 	if ctx == 0 {
 		return nil, errInvalidContext
 	}
-
-	count := GetSampledCandidatesCountIth(ctx, i)
-	if count == 0 {
-		return nil, nil
-	}
-
 	var result *Token
 	getSampledCandidatesIthFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), &i)
 	if result == nil {
 		return nil, nil
 	}
-
-	return unsafe.Slice(result, count), nil
+	return unsafe.Slice(result, nVocab), nil
 }
 
-// GetSampledCandidatesCountIth retrieves the count of sampled candidates for the ith position.
-func GetSampledCandidatesCountIth(ctx Context, i int32) uint32 {
+// GetSampledCandidatesCountIth retrieves the count of sampled candidates for the ith output.
+func GetSampledCandidatesCountIth(ctx Context, i int32) (uint32, error) {
 	if ctx == 0 {
-		return 0
+		return 0, errInvalidContext
 	}
 	var result ffi.Arg
 	getSampledCandidatesCountIthFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&ctx), &i)
-	return uint32(result)
+	return uint32(result), nil
 }
 
-// SetAbortCallback sets a callback that will be called regularly during computation.
-// If the callback returns true, the computation will be aborted.
-// The callback function should have the signature: func(data unsafe.Pointer) bool
-func SetAbortCallback(ctx Context, callback func(data unsafe.Pointer) bool, data unsafe.Pointer) error {
-	if ctx == 0 {
-		return errInvalidContext
-	}
+// AbortFunc is a callback function that can be used to abort computation.
+type AbortFunc func() bool
 
-	// Note: This requires careful handling of Go callbacks in C
-	// For now, we'll pass nil for both callback and data to clear any existing callback
-	var callbackPtr unsafe.Pointer
-	if callback != nil {
-		// In a real implementation, you would need to use cgo or similar mechanism
-		// to properly bridge Go callbacks to C function pointers
-		// For now, this is a placeholder
-		callbackPtr = nil
-	}
+// SetAbortCallback sets a callback function that can be used to abort computation.
+// The callback is called before ggml computation. If it returns true, the computation is aborted.
+// The data parameter is passed to the callback function on each invocation.
+// Pass nil for fn to clear the abort callback.
+func SetAbortCallback(ctx Context, fn AbortFunc) {
+	callback := newAbortCallback(fn)
 
-	setAbortCallbackFunc.Call(nil, unsafe.Pointer(&ctx), callbackPtr, data)
-	return nil
+	var nilPtr uintptr
+	setAbortCallbackFunc.Call(nil, unsafe.Pointer(&ctx), unsafe.Pointer(&callback), unsafe.Pointer(&nilPtr))
+}
+
+// newAbortCallback creates a C-compatible callback from a Go AbortFunc.
+func newAbortCallback(fn AbortFunc) uintptr {
+	return purego.NewCallback(func(data uintptr) uintptr {
+		if fn() {
+			return 1
+		}
+		return 0
+	})
 }

@@ -3,7 +3,6 @@ package template
 import (
 	"errors"
 	"io"
-	"sync"
 
 	"github.com/getkawai/llamalib/message"
 	"github.com/nikolalohinski/gonja/v2"
@@ -11,18 +10,13 @@ import (
 	"github.com/nikolalohinski/gonja/v2/loaders"
 )
 
-var gonjaInit sync.Once
-
 // Apply applies a jinja chat template to a slice of [message.Message], Set addAssistantPrompt to true to generate the
 // assistant prompt, for example on the first message.
 func Apply(tmpl string, messages []message.Message, addAssistantPrompt bool) (string, error) {
-	// Initialize gonja settings once to avoid data races
-	gonjaInit.Do(func() {
-		// prevent filesystem access
-		gonja.DefaultLoader = &NoFSLoader{}
-		// disable logging
-		gonja.SetLoggerOutput(io.Discard)
-	})
+	// prevent filesystem access
+	gonja.DefaultLoader = &NoFSLoader{}
+	// disable logging
+	gonja.SetLoggerOutput(io.Discard)
 
 	t, err := gonja.FromString(tmpl)
 	if err != nil {
