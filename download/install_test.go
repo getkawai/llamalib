@@ -9,9 +9,6 @@ func TestInstall(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skip("skipping test since github API sends 403 error")
 	}
-	if runtime.GOOS == "windows" {
-		t.Skip("skipping test due to pre-existing version file bug on Windows")
-	}
 
 	dest := t.TempDir()
 

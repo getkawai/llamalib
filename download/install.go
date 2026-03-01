@@ -129,6 +129,11 @@ func installLlamaCpp(libPath string, processor Processor, version string) error 
 }
 
 func createVersionFile(libPath string, version string) error {
+	// Ensure the directory exists
+	if err := os.MkdirAll(libPath, 0755); err != nil {
+		return fmt.Errorf("error creating directory: %w", err)
+	}
+
 	versionInfoPath := filepath.Join(libPath, versionFile)
 
 	f, err := os.Create(versionInfoPath)
