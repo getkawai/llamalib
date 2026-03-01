@@ -98,7 +98,7 @@ func benchmarkSetupOnce(b *testing.B) {
 
 	benchTemplate = llama.ModelChatTemplate(model, "")
 
-	data, x, y, err := openImageFile("../../images/domestic_llama.jpg")
+	data, x, y, err := openImageFile("testdata/images/domestic_llama.jpg")
 	if err != nil {
 		b.Fatal("could not open file")
 	}

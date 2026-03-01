@@ -56,13 +56,16 @@ func main() {
 	// Apply chat template
 	buf := make([]byte, 4096)
 	sz := llama.ChatApplyTemplate("", chat, false, buf)
-	if sz <= 0 {
-		fmt.Println("Error applying chat template")
-		os.Exit(1)
+	
+	var prompt string
+	if sz > 0 {
+		prompt = string(buf[:sz])
+		fmt.Printf("Formatted prompt: %s\n", prompt)
+	} else {
+		// Fallback to simple prompt if template fails
+		prompt = "Hello, how are you?"
+		fmt.Printf("Using simple prompt: %s\n", prompt)
 	}
-
-	prompt := string(buf[:sz])
-	fmt.Printf("Formatted prompt: %s\n", prompt)
 
 	// Setup samplers
 	samplers := []llama.SamplerType{
