@@ -149,54 +149,59 @@ if [ "$SKIP_MODELS" = false ]; then
         fi
 
         echo "   Downloading $filename..."
-        curl -L -o "$output" "$url"
+        if ! curl -f -L -o "$output" "$url"; then
+            echo "   ❌ Error: Failed to download $filename from $url"
+            rm -f "$output"
+            return 1
+        fi
+        echo "   ✓ Downloaded $filename"
     }
 
 # SmolLM - main chat model
 download_model \
     "https://huggingface.co/QuantFactory/SmolLM-135M-GGUF/resolve/main/SmolLM-135M.Q2_K.gguf" \
-    "$MODELS_DIR/SmolLM-135M.Q2_K.gguf"
+    "$MODELS_DIR/SmolLM-135M.Q2_K.gguf" || exit 1
 
 # SmolVLM - vision-language model
 download_model \
     "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf" \
-    "$MODELS_DIR/SmolVLM-256M-Instruct-Q8_0.gguf"
+    "$MODELS_DIR/SmolVLM-256M-Instruct-Q8_0.gguf" || exit 1
 
 download_model \
     "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf" \
-    "$MODELS_DIR/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf"
+    "$MODELS_DIR/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf" || exit 1
 
 # Embedding model
 download_model \
     "https://huggingface.co/ggml-org/models-moved/resolve/main/jina-reranker-v1-tiny-en/ggml-model-f16.gguf" \
-    "$MODELS_DIR/ggml-model-f16.gguf"
+    "$MODELS_DIR/ggml-model-f16.gguf" || exit 1
 
 # Encoder model
 download_model \
     "https://huggingface.co/callgg/t5-base-encoder-f32/resolve/main/t5base-encoder-q4_0.gguf" \
-    "$MODELS_DIR/t5base-encoder-q4_0.gguf"
+    "$MODELS_DIR/t5base-encoder-q4_0.gguf" || exit 1
 
 # LoRA test models
 download_model \
     "https://huggingface.co/deadprogram/yzma-tests/resolve/main/Gemma2-Base-F32.gguf" \
-    "$MODELS_DIR/Gemma2-Base-F32.gguf"
+    "$MODELS_DIR/Gemma2-Base-F32.gguf" || exit 1
 
 download_model \
     "https://huggingface.co/deadprogram/yzma-tests/resolve/main/Gemma2-Lora-F32-LoRA.gguf" \
-    "$MODELS_DIR/Gemma2-Lora-F32-LoRA.gguf"
+    "$MODELS_DIR/Gemma2-Lora-F32-LoRA.gguf" || exit 1
 
 # Split model test files
 download_model \
     "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00001-of-00003.gguf" \
-    "$MODELS_DIR/stories15M-q8_0-00001-of-00003.gguf"
+    "$MODELS_DIR/stories15M-q8_0-00001-of-00003.gguf" || exit 1
 
 download_model \
     "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00002-of-00003.gguf" \
-    "$MODELS_DIR/stories15M-q8_0-00002-of-00003.gguf"
+    "$MODELS_DIR/stories15M-q8_0-00002-of-00003.gguf" || exit 1
 
 download_model \
     "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00003-of-00003.gguf" \
-    "$MODELS_DIR/stories15M-q8_0-00003-of-00003.gguf"
+    "$MODELS_DIR/stories15M-q8_0-00003-of-00003.gguf" || exit 1
 
     echo ""
     echo "✅ All test models downloaded"

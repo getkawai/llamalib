@@ -98,7 +98,13 @@ function Get-Model {
     }
 
     Write-Host "   Downloading $filename..."
-    Invoke-WebRequest -Uri $Url -OutFile $Output
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $Output -ErrorAction Stop
+        Write-Host "   ✓ Downloaded $filename"
+    } catch {
+        Write-Error "Failed to download $filename from $Url : $_"
+        exit 1
+    }
 }
 
 # SmolLM - main chat model
