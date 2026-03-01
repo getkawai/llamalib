@@ -108,12 +108,12 @@ ls -la "$LIB_DIR"
 EXTRACTED_SUBDIR=$(find "$LIB_DIR" -maxdepth 1 -type d -name "llama-*" | head -1)
 if [ -n "$EXTRACTED_SUBDIR" ] && [ "$EXTRACTED_SUBDIR" != "$LIB_DIR" ]; then
     echo "   Found extracted directory: $EXTRACTED_SUBDIR"
-    
-    # Copy all required libraries (including versioned .so files)
-    for lib in "${LIB_NAME}${LIB_EXT}" "${LIB_NAME}${LIB_EXT}."* "libggml${LIB_EXT}" "libggml${LIB_EXT}."* "libggml-base${LIB_EXT}" "libggml-base${LIB_EXT}."* "libggml-cpu${LIB_EXT}" "libggml-cpu${LIB_EXT}."*; do
-        if [ -f "$EXTRACTED_SUBDIR/$lib" ]; then
-            cp "$EXTRACTED_SUBDIR/$lib" "$LIB_DIR/"
-            echo "   Copied $lib to $LIB_DIR/"
+
+    # Copy all .so libraries (including versioned ones like libllama.so.0, libllama.so.0.0.8182)
+    for lib in "$EXTRACTED_SUBDIR"/*.so "$EXTRACTED_SUBDIR"/*.so.*; do
+        if [ -f "$lib" ]; then
+            cp "$lib" "$LIB_DIR/"
+            echo "   Copied $(basename "$lib") to $LIB_DIR/"
         fi
     done
 fi
