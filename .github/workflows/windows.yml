@@ -71,7 +71,7 @@ jobs:
         if: steps.cache-models.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          mkdir -p ./models
+          New-Item -ItemType Directory -Force -Path "./models" | Out-Null
           Invoke-WebRequest -Uri "https://huggingface.co/QuantFactory/SmolLM-135M-GGUF/resolve/main/SmolLM-135M.Q2_K.gguf" -OutFile "./models/SmolLM-135M.Q2_K.gguf"
           Invoke-WebRequest -Uri "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf" -OutFile "./models/SmolVLM-256M-Instruct-Q8_0.gguf"
           Invoke-WebRequest -Uri "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf" -OutFile "./models/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf"

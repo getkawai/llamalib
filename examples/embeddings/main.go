@@ -40,7 +40,6 @@ func main() {
 
 	// Initialize llama.cpp
 	llama.Init()
-	defer llama.BackendFree()
 
 	// Load the model
 	model, err := llama.ModelLoadFromFile(*modelPath, llama.ModelDefaultParams())
@@ -88,27 +87,41 @@ func main() {
 
 	fmt.Printf("Embedding dimensions per token: %d\n", nEmbeddings)
 	fmt.Printf("Total embedding values: %d\n", len(embeddings))
-	fmt.Printf("Embedding (first 10 values): %v\n", embeddings[:10])
+	
+	// Safe slice access for first 10 values
+	if len(embeddings) > 0 {
+		safeEnd := 10
+		if len(embeddings) < safeEnd {
+			safeEnd = len(embeddings)
+		}
+		fmt.Printf("Embedding (first %d values): %v\n", safeEnd, embeddings[:safeEnd])
+	} else {
+		fmt.Println("Embedding (first 10 values): (empty)")
+	}
 
 	// Calculate some basic statistics
 	var sum, min, max float32
-	min = embeddings[0]
-	max = embeddings[0]
-	for _, v := range embeddings {
-		sum += v
-		if v < min {
-			min = v
+	if len(embeddings) > 0 {
+		min = embeddings[0]
+		max = embeddings[0]
+		for _, v := range embeddings {
+			sum += v
+			if v < min {
+				min = v
+			}
+			if v > max {
+				max = v
+			}
 		}
-		if v > max {
-			max = v
-		}
-	}
-	mean := sum / float32(len(embeddings))
+		mean := sum / float32(len(embeddings))
 
-	fmt.Printf("\nEmbedding statistics:\n")
-	fmt.Printf("  Mean: %.6f\n", mean)
-	fmt.Printf("  Min:  %.6f\n", min)
-	fmt.Printf("  Max:  %.6f\n", max)
+		fmt.Printf("\nEmbedding statistics:\n")
+		fmt.Printf("  Mean: %.6f\n", mean)
+		fmt.Printf("  Min:  %.6f\n", min)
+		fmt.Printf("  Max:  %.6f\n", max)
+	} else {
+		fmt.Println("\nEmbedding statistics: (no data)")
+	}
 
 	fmt.Println("\nEmbedding generation complete!")
 }

@@ -36,8 +36,37 @@ $TempZip = "$env:TEMP\llama-cpp.zip"
 
 Write-Host "   Downloading: $FileName"
 
-Invoke-WebRequest -Uri $UrlBase -OutFile $TempZip
-Expand-Archive -Path $TempZip -DestinationPath $LibDir -Force
+try {
+    Invoke-WebRequest -Uri $UrlBase -OutFile $TempZip -ErrorAction Stop
+} catch {
+    Write-Error "Failed to download llama.cpp from $UrlBase : $_"
+    if (Test-Path $TempZip) {
+        Remove-Item $TempZip -Force
+    }
+    exit 1
+}
+
+# Verify download succeeded
+if (!(Test-Path $TempZip)) {
+    Write-Error "Download failed: $TempZip does not exist"
+    exit 1
+}
+
+$zipSize = (Get-Item $TempZip).Length
+if ($zipSize -eq 0) {
+    Write-Error "Download failed: $TempZip is empty"
+    Remove-Item $TempZip -Force
+    exit 1
+}
+
+Write-Host "   Downloaded $($zipSize / 1MB) MB"
+
+try {
+    Expand-Archive -Path $TempZip -DestinationPath $LibDir -Force
+} catch {
+    Write-Error "Failed to extract archive: $_"
+    exit 1
+}
 
 # Verify library exists
 $LibName = "llama.dll"
@@ -55,66 +84,66 @@ Write-Host "✅ llama.cpp binaries installed"
 Write-Host ""
 Write-Host "📥 Downloading test models..."
 
-function Download-Model {
+function Get-Model {
     param(
         [string]$Url,
         [string]$Output
     )
-    
+
     $filename = Split-Path -Path $Output -Leaf
-    
+
     if (Test-Path $Output) {
         Write-Host "   ✓ $filename already exists"
         return
     }
-    
+
     Write-Host "   Downloading $filename..."
     Invoke-WebRequest -Uri $Url -OutFile $Output
 }
 
 # SmolLM - main chat model
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/QuantFactory/SmolLM-135M-GGUF/resolve/main/SmolLM-135M.Q2_K.gguf" `
     -Output "$ModelsDir\SmolLM-135M.Q2_K.gguf"
 
 # SmolVLM - vision-language model
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf" `
     -Output "$ModelsDir\SmolVLM-256M-Instruct-Q8_0.gguf"
 
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf" `
     -Output "$ModelsDir\mmproj-SmolVLM-256M-Instruct-Q8_0.gguf"
 
 # Embedding model
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/ggml-org/models-moved/resolve/main/jina-reranker-v1-tiny-en/ggml-model-f16.gguf" `
     -Output "$ModelsDir\ggml-model-f16.gguf"
 
 # Encoder model
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/callgg/t5-base-encoder-f32/resolve/main/t5base-encoder-q4_0.gguf" `
     -Output "$ModelsDir\t5base-encoder-q4_0.gguf"
 
 # LoRA test models
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/deadprogram/yzma-tests/resolve/main/Gemma2-Base-F32.gguf" `
     -Output "$ModelsDir\Gemma2-Base-F32.gguf"
 
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/deadprogram/yzma-tests/resolve/main/Gemma2-Lora-F32-LoRA.gguf" `
     -Output "$ModelsDir\Gemma2-Lora-F32-LoRA.gguf"
 
 # Split model test files
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00001-of-00003.gguf" `
     -Output "$ModelsDir\stories15M-q8_0-00001-of-00003.gguf"
 
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00002-of-00003.gguf" `
     -Output "$ModelsDir\stories15M-q8_0-00002-of-00003.gguf"
 
-Download-Model `
+Get-Model `
     -Url "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00003-of-00003.gguf" `
     -Output "$ModelsDir\stories15M-q8_0-00003-of-00003.gguf"
 

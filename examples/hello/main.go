@@ -31,7 +31,6 @@ func main() {
 
 	// Initialize llama.cpp
 	llama.Init()
-	defer llama.BackendFree()
 
 	// Load the model
 	model, err := llama.ModelLoadFromFile(modelPath, llama.ModelDefaultParams())

@@ -7,11 +7,24 @@ set -e
 LIB_DIR="${1:-$GITHUB_WORKSPACE/lib}"
 MODELS_DIR="${2:-$GITHUB_WORKSPACE/models}"
 LLAMA_VERSION="${3:-latest}"
+SKIP_MODELS=false
+
+# Parse optional arguments
+for arg in "${@:4}"; do
+    case $arg in
+        --skip-models)
+            SKIP_MODELS=true
+            ;;
+    esac
+done
 
 echo "🔧 Setting up llamalib test environment..."
 echo "   Library directory: $LIB_DIR"
 echo "   Models directory: $MODELS_DIR"
 echo "   llama.cpp version: $LLAMA_VERSION"
+if [ "$SKIP_MODELS" = true ]; then
+    echo "   Skipping model downloads (handled by workflow cache)"
+fi
 
 # Create directories
 mkdir -p "$LIB_DIR"
@@ -37,56 +50,6 @@ elif command -v vulkaninfo &> /dev/null; then
     echo "   Using Vulkan backend"
 fi
 
-# Create a simple Go program to install llama.cpp and download models
-cat > /tmp/llamalib_setup.go << 'GOEOF'
-package main
-
-import (
-	"fmt"
-	"log"
-	"os"
-	"path/filepath"
-
-	llamalib "github.com/getkawai/llamalib"
-)
-
-func main() {
-	if len(os.Args) < 4 {
-		fmt.Println("Usage: llamalib_setup <lib_dir> <models_dir> <processor>")
-		os.Exit(1)
-	}
-
-	libDir := os.Args[1]
-	modelsDir := os.Args[2]
-	processor := os.Args[3]
-
-	// Create installer
-	installer := llamalib.NewLlamaCppInstaller()
-	installer.BinaryPath = libDir
-	installer.ModelsDir = modelsDir
-
-	// Install llama.cpp
-	log.Println("Installing llama.cpp...")
-	if err := installer.InstallLlamaCpp(); err != nil {
-		log.Fatalf("Failed to install llama.cpp: %v", err)
-	}
-	log.Println("✅ llama.cpp installed")
-
-	// Download test models
-	log.Println("Downloading test models...")
-
-	// SmolLM for chat/inference tests
-	chatModels := installer.GetAvailableChatModels()
-	if len(chatModels) == 0 {
-		log.Println("No chat models found, would download test model...")
-		// Model download logic would go here
-	}
-
-	log.Println("✅ Setup complete")
-}
-GOEOF
-
-# For now, use direct download approach
 echo ""
 echo "📥 Downloading llama.cpp binaries..."
 
@@ -108,7 +71,12 @@ case "$OS-$PROCESSOR" in
         ;;
     darwin-metal)
         LIB_NAME="libllama.dylib"
-        FILE_NAME="llama-$LLAMA_VERSION-bin-macos-arm64.tar.gz"
+        # Detect architecture for macOS
+        if [ "$ARCH" = "arm64" ]; then
+            FILE_NAME="llama-$LLAMA_VERSION-bin-macos-arm64.tar.gz"
+        else
+            FILE_NAME="llama-$LLAMA_VERSION-bin-macos-x64.tar.gz"
+        fi
         ;;
     *)
         LIB_NAME="libllama.so"
@@ -122,7 +90,10 @@ echo "   Downloading: $FILE_NAME"
 
 # Download and extract llama.cpp
 TEMP_ARCHIVE="/tmp/llama-cpp.tar.gz"
-curl -L -o "$TEMP_ARCHIVE" "$URL_BASE"
+if ! curl -f -L -o "$TEMP_ARCHIVE" "$URL_BASE"; then
+    echo "   ❌ Error: Failed to download from $URL_BASE"
+    exit 1
+fi
 tar -xzf "$TEMP_ARCHIVE" -C "$LIB_DIR"
 
 # List extracted contents for debugging
@@ -159,22 +130,27 @@ done
 echo "✅ llama.cpp binaries installed"
 
 # Download test models
-echo ""
-echo "📥 Downloading test models..."
+if [ "$SKIP_MODELS" = false ]; then
+    echo ""
+    echo "📥 Downloading test models..."
 
-download_model() {
-    local url="$1"
-    local output="$2"
-    local filename=$(basename "$output")
-    
-    if [ -f "$output" ]; then
-        echo "   ✓ $filename already exists"
-        return
-    fi
-    
-    echo "   Downloading $filename..."
-    curl -L -o "$output" "$url"
-}
+    download_model() {
+        local url="$1"
+        local output="$2"
+        local filename
+        filename=$(basename "$output") || {
+            echo "   ❌ Error: Failed to get basename of $output"
+            return 1
+        }
+
+        if [ -f "$output" ]; then
+            echo "   ✓ $filename already exists"
+            return
+        fi
+
+        echo "   Downloading $filename..."
+        curl -L -o "$output" "$url"
+    }
 
 # SmolLM - main chat model
 download_model \
@@ -222,8 +198,9 @@ download_model \
     "https://huggingface.co/ggml-org/models-moved/resolve/main/tinyllamas/split/stories15M-q8_0-00003-of-00003.gguf" \
     "$MODELS_DIR/stories15M-q8_0-00003-of-00003.gguf"
 
-echo ""
-echo "✅ All test models downloaded"
+    echo ""
+    echo "✅ All test models downloaded"
+fi
 
 # Output environment variables
 echo ""
