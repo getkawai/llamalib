@@ -90,18 +90,33 @@ func initialInstall(libPath string, processor Processor) error {
 }
 
 func downloadVersionFile(llamaCppVersionDocURL string) (string, error) {
-	r, err := http.DefaultClient.Get(llamaCppVersionDocURL)
-	if err != nil {
-		return "", fmt.Errorf("error getting llama.cpp version document: %w", err)
-	}
-	defer r.Body.Close()
-
+	// Retry logic for GitHub API rate limiting
 	var tag tag
-	if err := json.NewDecoder(r.Body).Decode(&tag); err != nil {
+	var err error
+	
+	for attempt := 0; attempt < 3; attempt++ {
+		r, err := http.DefaultClient.Get(llamaCppVersionDocURL)
+		if err != nil {
+			if attempt < 2 {
+				continue // Retry
+			}
+			return "", fmt.Errorf("error getting llama.cpp version document: %w", err)
+		}
+		
+		err = json.NewDecoder(r.Body).Decode(&tag)
+		r.Body.Close()
+		
+		if err == nil && tag.TagName != "" {
+			return tag.TagName, nil
+		}
+		
+		if attempt < 2 {
+			continue // Retry
+		}
 		return "", fmt.Errorf("error decoding llama.cpp version document: %w", err)
 	}
-
-	return tag.TagName, nil
+	
+	return "", fmt.Errorf("failed to get version after 3 attempts: %w", err)
 }
 
 func upgradeInstall(libPath string, processor Processor, version string) error {
@@ -117,8 +132,16 @@ func upgradeInstall(libPath string, processor Processor, version string) error {
 }
 
 func installLlamaCpp(libPath string, processor Processor, version string) error {
+	// Clean contents of libPath but don't remove the directory itself
+	// This ensures the directory exists for subsequent operations
 	if _, err := os.Stat(libPath); !os.IsNotExist(err) {
-		os.RemoveAll(libPath)
+		// Remove contents but keep the directory
+		entries, err := os.ReadDir(libPath)
+		if err == nil {
+			for _, entry := range entries {
+				os.RemoveAll(filepath.Join(libPath, entry.Name()))
+			}
+		}
 	}
 
 	if err := Get(runtime.GOARCH, runtime.GOOS, processor.String(), version, libPath); err != nil {
@@ -129,6 +152,11 @@ func installLlamaCpp(libPath string, processor Processor, version string) error 
 }
 
 func createVersionFile(libPath string, version string) error {
+	// Ensure the directory exists
+	if err := os.MkdirAll(libPath, 0755); err != nil {
+		return fmt.Errorf("error creating directory: %w", err)
+	}
+
 	versionInfoPath := filepath.Join(libPath, versionFile)
 
 	f, err := os.Create(versionInfoPath)
