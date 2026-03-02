@@ -288,6 +288,74 @@ func downloadWithGrab(ctx context.Context, url, dest string, progress ProgressCa
 }
 
 // downloadAndExtractTarGz downloads a .tar.gz file and extracts it to the destination directory.
+// isSafePath validates that the given archive entry name, when extracted into
+// dest, does not escape dest. It resolves any existing symlinks on disk.
+func isSafePath(dest, name string) (string, bool) {
+	// Disallow absolute paths in the archive.
+	if filepath.IsAbs(name) {
+		return "", false
+	}
+
+	joined := filepath.Join(dest, name)
+
+	// Resolve any symlinks that may already exist on disk.
+	resolved, err := filepath.EvalSymlinks(filepath.Dir(joined))
+	if err != nil {
+		// If the directory does not exist yet, fall back to dest.
+		// This is safe because nothing outside dest has been created by us.
+		resolved = dest
+	}
+
+	finalPath := filepath.Join(resolved, filepath.Base(joined))
+	rel, err := filepath.Rel(dest, finalPath)
+	if err != nil {
+		return "", false
+	}
+	rel = filepath.Clean(rel)
+	if strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." {
+		return "", false
+	}
+
+	return finalPath, true
+}
+
+// isSafeLinkTarget validates that a symlink target from the archive cannot be
+// used to escape dest. The linkTarget is interpreted relative to dest.
+func isSafeLinkTarget(dest, linkTarget string) bool {
+	if linkTarget == "" {
+		return false
+	}
+
+	// Absolute link targets are not allowed.
+	if filepath.IsAbs(linkTarget) {
+		return false
+	}
+
+	joined := filepath.Join(dest, linkTarget)
+	resolved, err := filepath.EvalSymlinks(joined)
+	if err != nil {
+		// If the target path (or its parents) do not exist yet, we still want to
+		// enforce that, syntactically, it would stay within dest.
+		rel, errRel := filepath.Rel(dest, filepath.Clean(joined))
+		if errRel != nil {
+			return false
+		}
+		rel = filepath.Clean(rel)
+		return !(strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == "..")
+	}
+
+	rel, err := filepath.Rel(dest, resolved)
+	if err != nil {
+		return false
+	}
+	rel = filepath.Clean(rel)
+	if strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." {
+		return false
+	}
+
+	return true
+}
+
 func downloadAndExtractTarGz(ctx context.Context, url, dest string, progress ProgressCallback) error {
 	// Ensure destination directory exists
 	if err := os.MkdirAll(dest, 0755); err != nil {
@@ -376,12 +444,18 @@ func downloadAndExtractTarGz(ctx context.Context, url, dest string, progress Pro
 			name = name[idx+1:]
 		}
 
+		name = filepath.Clean(name)
+
 		// Skip empty names (the top-level directory itself)
-		if name == "" {
+		if name == "" || name == "." {
 			continue
 		}
 
-		target := filepath.Join(dest, filepath.Clean(name))
+		// Ensure the target path stays within dest, resolving any existing symlinks.
+		target, ok := isSafePath(dest, name)
+		if !ok {
+			return fmt.Errorf("unsafe path in archive entry: %q", header.Name)
+		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
@@ -407,7 +481,10 @@ func downloadAndExtractTarGz(ctx context.Context, url, dest string, progress Pro
 			}
 			f.Close()
 		case tar.TypeSymlink:
-			// Handle symlinks
+			// Handle symlinks safely: ensure both the link path and its target stay within dest.
+			if !isSafeLinkTarget(dest, header.Linkname) {
+				return fmt.Errorf("unsafe symlink target in archive entry %q -> %q", header.Name, header.Linkname)
+			}
 			if err := os.Symlink(header.Linkname, target); err != nil {
 				// Ignore error if symlink already exists
 				if !os.IsExist(err) {
