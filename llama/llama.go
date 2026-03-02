@@ -2,10 +2,11 @@ package llama
 
 // Common types matching llama.cpp
 type (
-	Token  int32
-	Pos    int32
-	SeqId  int32
-	Memory uintptr
+	Token   int32
+	Pos     int32
+	SeqId   int32
+	Memory  uintptr
+	Sampler uintptr
 )
 
 // Constants from llama.h
@@ -362,6 +363,7 @@ type ModelQuantizeParams struct {
 	OnlyCopy             uint8 // only copy tensors - ftype, allow_requantize and quantize_output_tensor are ignored
 	Pure                 uint8 // quantize all tensors to the default type
 	KeepSplit            uint8 // keep split tensors (bool as uint8)
+	DryRun               uint8 // calculate and show the final quantization size without performing quantization (bool as uint8)
 	IMatrix              *byte // pointer to importance matrix data
 	KvOverrides          *byte // pointer to vector containing overrides
 	TensorTypes          *byte // pointer to vector containing tensor types
@@ -377,6 +379,12 @@ type ChatMessage struct {
 // Sampler chain parameters
 type SamplerChainParams struct {
 	NoPerf uint8 // whether to measure performance timings (bool as uint8)
+}
+
+// llama_sampler_seq_config
+type SamplerSeqConfig struct {
+	SeqId   SeqId
+	Sampler Sampler
 }
 
 // Logit bias

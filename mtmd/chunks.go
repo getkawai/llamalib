@@ -82,11 +82,11 @@ func loadChunkFuncs(lib ffi.Lib) error {
 		return loadError("mtmd_input_chunks_free", err)
 	}
 
-	if inputChunksSizeFunc, err = lib.Prep("mtmd_input_chunks_size", &ffi.TypeSint32, &ffi.TypePointer); err != nil {
+	if inputChunksSizeFunc, err = lib.Prep("mtmd_input_chunks_size", &ffiTypeSize, &ffi.TypePointer); err != nil {
 		return loadError("mtmd_input_chunks_size", err)
 	}
 
-	if inputChunksGetFunc, err = lib.Prep("mtmd_input_chunks_get", &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeSint32); err != nil {
+	if inputChunksGetFunc, err = lib.Prep("mtmd_input_chunks_get", &ffi.TypePointer, &ffi.TypePointer, &ffiTypeSize); err != nil {
 		return loadError("mtmd_input_chunks_get", err)
 	}
 
@@ -98,7 +98,7 @@ func loadChunkFuncs(lib ffi.Lib) error {
 		return loadError("mtmd_input_chunk_get_tokens_text", err)
 	}
 
-	if inputChunkGetNTokensFunc, err = lib.Prep("mtmd_input_chunk_get_n_tokens", &ffi.TypeSint32, &ffi.TypePointer); err != nil {
+	if inputChunkGetNTokensFunc, err = lib.Prep("mtmd_input_chunk_get_n_tokens", &ffiTypeSize, &ffi.TypePointer); err != nil {
 		return loadError("mtmd_input_chunk_get_n_tokens", err)
 	}
 
@@ -122,15 +122,15 @@ func loadChunkFuncs(lib ffi.Lib) error {
 		return loadError("mtmd_input_chunk_get_tokens_image", err)
 	}
 
-	if inputImageTokensGetNTokensFunc, err = lib.Prep("mtmd_image_tokens_get_n_tokens", &ffi.TypeSint32, &ffi.TypePointer); err != nil {
+	if inputImageTokensGetNTokensFunc, err = lib.Prep("mtmd_image_tokens_get_n_tokens", &ffiTypeSize, &ffi.TypePointer); err != nil {
 		return loadError("mtmd_image_tokens_get_n_tokens", err)
 	}
 
-	if inputImageTokensGetNXFunc, err = lib.Prep("mtmd_image_tokens_get_nx", &ffi.TypeSint32, &ffi.TypePointer); err != nil {
+	if inputImageTokensGetNXFunc, err = lib.Prep("mtmd_image_tokens_get_nx", &ffiTypeSize, &ffi.TypePointer); err != nil {
 		return loadError("mtmd_image_tokens_get_nx", err)
 	}
 
-	if inputImageTokensGetNYFunc, err = lib.Prep("mtmd_image_tokens_get_ny", &ffi.TypeSint32, &ffi.TypePointer); err != nil {
+	if inputImageTokensGetNYFunc, err = lib.Prep("mtmd_image_tokens_get_ny", &ffiTypeSize, &ffi.TypePointer); err != nil {
 		return loadError("mtmd_image_tokens_get_ny", err)
 	}
 
@@ -163,23 +163,23 @@ func InputChunksFree(chunks InputChunks) {
 }
 
 // InputChunksSize returns the number of InputChunk in the list.
-func InputChunksSize(chunks InputChunks) uint32 {
+func InputChunksSize(chunks InputChunks) uint64 {
 	if chunks == 0 {
 		return 0
 	}
 	var result ffi.Arg
 	inputChunksSizeFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&chunks))
 
-	return uint32(result)
+	return uint64(result)
 }
 
 // InputChunksGet retrieves the input chunk at the specified index.
-func InputChunksGet(chunks InputChunks, idx uint32) InputChunk {
+func InputChunksGet(chunks InputChunks, idx uint64) InputChunk {
 	var chunk InputChunk
 	if chunks == 0 {
 		return chunk
 	}
-	inputChunksGetFunc.Call(unsafe.Pointer(&chunk), unsafe.Pointer(&chunks), unsafe.Pointer(&idx))
+	inputChunksGetFunc.Call(unsafe.Pointer(&chunk), unsafe.Pointer(&chunks), &idx)
 	return chunk
 }
 
@@ -199,8 +199,9 @@ func InputChunkGetTokensText(chunk InputChunk) []llama.Token {
 		return nil
 	}
 	var tokensPtr *llama.Token
-	var nTokens uint32
-	inputChunkGetTokensTextFunc.Call(unsafe.Pointer(&tokensPtr), unsafe.Pointer(&chunk), unsafe.Pointer(&nTokens))
+	var nTokens uint64
+	nt := &nTokens
+	inputChunkGetTokensTextFunc.Call(unsafe.Pointer(&tokensPtr), unsafe.Pointer(&chunk), unsafe.Pointer(&nt))
 
 	if tokensPtr == nil || nTokens == 0 {
 		return nil
@@ -210,13 +211,13 @@ func InputChunkGetTokensText(chunk InputChunk) []llama.Token {
 }
 
 // InputChunkGetNTokens retrieves the number of tokens in the input chunk.
-func InputChunkGetNTokens(chunk InputChunk) uint32 {
+func InputChunkGetNTokens(chunk InputChunk) uint64 {
 	if chunk == 0 {
 		return 0
 	}
 	var result ffi.Arg
 	inputChunkGetNTokensFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&chunk))
-	return uint32(result)
+	return uint64(result)
 }
 
 // InputChunkGetId retrieves the ID of the input chunk.
@@ -273,33 +274,33 @@ func InputChunkGetTokensImage(chunk InputChunk) ImageTokens {
 }
 
 // ImageTokensGetNTokens returns the number of tokens in the image.
-func ImageTokensGetNTokens(imageTokens ImageTokens) uint32 {
+func ImageTokensGetNTokens(imageTokens ImageTokens) uint64 {
 	if imageTokens == 0 {
 		return 0
 	}
 	var result ffi.Arg
 	inputImageTokensGetNTokensFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&imageTokens))
-	return uint32(result)
+	return uint64(result)
 }
 
 // ImageTokensGetX returns the x size of the image tokens.
-func ImageTokensGetNX(imageTokens ImageTokens) uint32 {
+func ImageTokensGetNX(imageTokens ImageTokens) uint64 {
 	if imageTokens == 0 {
 		return 0
 	}
 	var result ffi.Arg
 	inputImageTokensGetNXFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&imageTokens))
-	return uint32(result)
+	return uint64(result)
 }
 
 // ImageTokensGetY returns the y size of the image tokens.
-func ImageTokensGetNY(imageTokens ImageTokens) uint32 {
+func ImageTokensGetNY(imageTokens ImageTokens) uint64 {
 	if imageTokens == 0 {
 		return 0
 	}
 	var result ffi.Arg
 	inputImageTokensGetNYFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&imageTokens))
-	return uint32(result)
+	return uint64(result)
 }
 
 // ImageTokensGetId returns the id of the image tokens.

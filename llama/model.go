@@ -5,21 +5,23 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/jupiterrider/ffi"
 	"github.com/getkawai/llamalib/utils"
+	"github.com/jupiterrider/ffi"
 )
 
 var (
-	// FFITypeModelParams represents the C struct llama_model_params
-	FFITypeModelParams = ffi.NewType(&ffi.TypePointer, &ffi.TypePointer, &ffi.TypeSint32,
+	ffiTypeSize = ffi.TypeUint64
+
+	// ffiTypeModelParams represents the C struct llama_model_params
+	ffiTypeModelParams = ffi.NewType(&ffi.TypePointer, &ffi.TypePointer, &ffi.TypeSint32,
 		&ffi.TypeSint32, &ffi.TypeSint32,
 		&ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer,
 		&ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8,
 		&ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8)
 
-	// FFITypeModelQuantizeParams represents the C struct llama_model_quantize_params
-	FFITypeModelQuantizeParams = ffi.NewType(&ffi.TypeSint32, &ffi.TypeSint32,
-		&ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8,
+	// ffiTypeModelQuantizeParams represents the C struct llama_model_quantize_params
+	ffiTypeModelQuantizeParams = ffi.NewType(&ffi.TypeSint32, &ffi.TypeSint32,
+		&ffi.TypeSint32, &ffi.TypeSint32, &ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8, &ffi.TypeUint8,
 		&ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer)
 )
 
@@ -139,20 +141,31 @@ var (
 	//        const char * fname_out,
 	//        const llama_model_quantize_params * params);
 	modelQuantizeFunc ffi.Fun
+
+	// LLAMA_API enum llama_params_fit_status llama_params_fit(
+	//                            const char   * path_model,
+	//             struct llama_model_params   * mparams,
+	//             struct llama_context_params * cparams,
+	//                                   float * tensor_split,
+	// struct llama_model_tensor_buft_override * tensor_buft_overrides,
+	//                                  size_t * margins,
+	//                                uint32_t   n_ctx_min,
+	//                     enum ggml_log_level   log_level);
+	modelParamsFitFunc ffi.Fun
 )
 
 func loadModelFuncs(lib ffi.Lib) error {
 	var err error
 
-	if modelDefaultParamsFunc, err = lib.Prep("llama_model_default_params", &FFITypeModelParams); err != nil {
+	if modelDefaultParamsFunc, err = lib.Prep("llama_model_default_params", &ffiTypeModelParams); err != nil {
 		return loadError("llama_model_default_params", err)
 	}
 
-	if modelLoadFromFileFunc, err = lib.Prep("llama_model_load_from_file", &ffi.TypePointer, &ffi.TypePointer, &FFITypeModelParams); err != nil {
+	if modelLoadFromFileFunc, err = lib.Prep("llama_model_load_from_file", &ffi.TypePointer, &ffi.TypePointer, &ffiTypeModelParams); err != nil {
 		return loadError("llama_model_load_from_file", err)
 	}
 
-	if modelLoadFromSplitsFunc, err = lib.Prep("llama_model_load_from_splits", &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeUint64, &FFITypeModelParams); err != nil {
+	if modelLoadFromSplitsFunc, err = lib.Prep("llama_model_load_from_splits", &ffi.TypePointer, &ffi.TypePointer, &ffiTypeSize, &ffiTypeModelParams); err != nil {
 		return loadError("llama_model_load_from_splits", err)
 	}
 
@@ -160,7 +173,7 @@ func loadModelFuncs(lib ffi.Lib) error {
 		return loadError("llama_model_free", err)
 	}
 
-	if initFromModelFunc, err = lib.Prep("llama_init_from_model", &ffi.TypePointer, &ffi.TypePointer, &FFITypeContextParams); err != nil {
+	if initFromModelFunc, err = lib.Prep("llama_init_from_model", &ffi.TypePointer, &ffi.TypePointer, &ffiTypeContextParams); err != nil {
 		return loadError("llama_init_from_model", err)
 	}
 
@@ -220,7 +233,7 @@ func loadModelFuncs(lib ffi.Lib) error {
 		return loadError("llama_model_cls_label", err)
 	}
 
-	if modelDescFunc, err = lib.Prep("llama_model_desc", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeSint32); err != nil {
+	if modelDescFunc, err = lib.Prep("llama_model_desc", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeUint64); err != nil {
 		return loadError("llama_model_desc", err)
 	}
 
@@ -248,7 +261,7 @@ func loadModelFuncs(lib ffi.Lib) error {
 		return loadError("llama_model_rope_type", err)
 	}
 
-	if modelMetaValStrFunc, err = lib.Prep("llama_model_meta_val_str", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeUint32); err != nil {
+	if modelMetaValStrFunc, err = lib.Prep("llama_model_meta_val_str", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffiTypeSize); err != nil {
 		return loadError("llama_model_meta_val_str", err)
 	}
 
@@ -256,11 +269,11 @@ func loadModelFuncs(lib ffi.Lib) error {
 		return loadError("llama_model_meta_count", err)
 	}
 
-	if modelMetaKeyByIndexFunc, err = lib.Prep("llama_model_meta_key_by_index", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypeUint32); err != nil {
+	if modelMetaKeyByIndexFunc, err = lib.Prep("llama_model_meta_key_by_index", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypeSint32, &ffi.TypePointer, &ffiTypeSize); err != nil {
 		return loadError("llama_model_meta_key_by_index", err)
 	}
 
-	if modelMetaValStrByIndexFunc, err = lib.Prep("llama_model_meta_val_str_by_index", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypeUint32); err != nil {
+	if modelMetaValStrByIndexFunc, err = lib.Prep("llama_model_meta_val_str_by_index", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypeSint32, &ffi.TypePointer, &ffiTypeSize); err != nil {
 		return loadError("llama_model_meta_val_str_by_index", err)
 	}
 
@@ -268,12 +281,16 @@ func loadModelFuncs(lib ffi.Lib) error {
 		return loadError("llama_model_meta_key_str", err)
 	}
 
-	if modelQuantizeDefaultParamsFunc, err = lib.Prep("llama_model_quantize_default_params", &FFITypeModelQuantizeParams); err != nil {
+	if modelQuantizeDefaultParamsFunc, err = lib.Prep("llama_model_quantize_default_params", &ffiTypeModelQuantizeParams); err != nil {
 		return loadError("llama_model_quantize_default_params", err)
 	}
 
 	if modelQuantizeFunc, err = lib.Prep("llama_model_quantize", &ffi.TypeUint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer); err != nil {
 		return loadError("llama_model_quantize", err)
+	}
+
+	if modelParamsFitFunc, err = lib.Prep("llama_params_fit", &ffi.TypeSint32, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypePointer, &ffi.TypeUint32, &ffi.TypeSint32); err != nil {
+		return loadError("llama_params_fit", err)
 	}
 
 	return nil
@@ -501,7 +518,7 @@ func ModelClsLabel(model Model, index uint32) string {
 		return ""
 	}
 	var labelPtr *byte
-	modelClsLabelFunc.Call(unsafe.Pointer(&labelPtr), unsafe.Pointer(&model), unsafe.Pointer(&index))
+	modelClsLabelFunc.Call(unsafe.Pointer(&labelPtr), unsafe.Pointer(&model), &index)
 
 	if labelPtr == nil {
 		return ""
@@ -854,4 +871,65 @@ func ModelQuantize(fnameInp, fnameOut string, params *ModelQuantizeParams) uint3
 	var result ffi.Arg
 	modelQuantizeFunc.Call(unsafe.Pointer(&result), unsafe.Pointer(&fileInp), unsafe.Pointer(&fileOut), unsafe.Pointer(&params))
 	return uint32(result)
+}
+
+type ModelParamsFitStatus int32
+
+const (
+	ModelParamsFitStatusSuccess ModelParamsFitStatus = 0 // found allocations that are projected to fit
+	ModelParamsFitStatusFailure ModelParamsFitStatus = 1 // could not find allocations that are projected to fit
+	ModelParamsFitStatusError   ModelParamsFitStatus = 2 // a hard error occurred
+)
+
+// ModelParamsFit attempts to fit model and context parameters to available device memory.
+// It assumes system memory is unlimited and only modifies parameters that have the same
+// value as in the default model params, with the exception of context size which is
+// modified if and only if equal to 0.
+//
+// Parameters:
+//   - pathModel: path to the model file
+//   - mparams: pointer to model parameters (will be modified to fit)
+//   - cparams: pointer to context parameters (will be modified to fit)
+//   - tensorSplit: writable buffer for tensor split, needs at least MaxDevices() elements
+//   - tensorBuftOverrides: writable buffer for overrides, needs at least MaxTensorBuftOverrides() elements
+//   - margins: margins of memory to leave per device in bytes
+//   - nCtxMin: minimum context size to set when trying to reduce memory use
+//   - logLevel: minimum log level to print during fitting, lower levels go to debug log
+//
+// Note: This function is NOT thread safe because it modifies the global llama logger state.
+func ModelParamsFit(pathModel string, mparams *ModelParams, cparams *ContextParams, tensorSplit []float32, tensorBuftOverrides []TensorBuftOverride, margins []uint64, nCtxMin uint32, logLevel LogLevel) ModelParamsFitStatus {
+	pathPtr, err := utils.BytePtrFromString(pathModel)
+	if err != nil {
+		return ModelParamsFitStatusError
+	}
+
+	var tensorSplitPtr *float32
+	if len(tensorSplit) > 0 {
+		tensorSplitPtr = &tensorSplit[0]
+	}
+
+	var tensorBuftOverridesPtr *TensorBuftOverride
+	if len(tensorBuftOverrides) > 0 {
+		tensorBuftOverridesPtr = &tensorBuftOverrides[0]
+	}
+
+	var marginsPtr *uint64
+	if len(margins) > 0 {
+		marginsPtr = &margins[0]
+	}
+
+	var result ffi.Arg
+	modelParamsFitFunc.Call(
+		unsafe.Pointer(&result),
+		unsafe.Pointer(&pathPtr),
+		unsafe.Pointer(&mparams),
+		unsafe.Pointer(&cparams),
+		unsafe.Pointer(&tensorSplitPtr),
+		unsafe.Pointer(&tensorBuftOverridesPtr),
+		unsafe.Pointer(&marginsPtr),
+		&nCtxMin,
+		&logLevel,
+	)
+
+	return ModelParamsFitStatus(int32(result))
 }
