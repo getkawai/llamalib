@@ -3,10 +3,12 @@ package download
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 var (
@@ -91,32 +93,59 @@ func initialInstall(libPath string, processor Processor) error {
 
 func downloadVersionFile(llamaCppVersionDocURL string) (string, error) {
 	// Retry logic for GitHub API rate limiting
-	var tag tag
-	var err error
+	var lastErr error
 	
 	for attempt := 0; attempt < 3; attempt++ {
 		r, err := http.DefaultClient.Get(llamaCppVersionDocURL)
 		if err != nil {
+			lastErr = fmt.Errorf("error getting llama.cpp version document: %w", err)
 			if attempt < 2 {
 				continue // Retry
 			}
-			return "", fmt.Errorf("error getting llama.cpp version document: %w", err)
+			return "", lastErr
 		}
-		
-		err = json.NewDecoder(r.Body).Decode(&tag)
+
+		body, readErr := io.ReadAll(r.Body)
 		r.Body.Close()
-		
-		if err == nil && tag.TagName != "" {
+		if readErr != nil {
+			lastErr = fmt.Errorf("error reading llama.cpp version document: %w", readErr)
+			if attempt < 2 {
+				continue // Retry
+			}
+			return "", lastErr
+		}
+
+		if r.StatusCode != http.StatusOK {
+			msg := strings.TrimSpace(string(body))
+			if msg == "" {
+				msg = "empty response body"
+			}
+			lastErr = fmt.Errorf("unexpected response status %d from llama.cpp version document: %s", r.StatusCode, msg)
+			if attempt < 2 {
+				continue // Retry
+			}
+			return "", lastErr
+		}
+
+		var tag tag
+		decodeErr := json.Unmarshal(body, &tag)
+		if decodeErr == nil && tag.TagName != "" {
 			return tag.TagName, nil
 		}
-		
+
+		if decodeErr != nil {
+			lastErr = fmt.Errorf("error decoding llama.cpp version document: %w", decodeErr)
+		} else {
+			lastErr = fmt.Errorf("error decoding llama.cpp version document: missing tag_name field")
+		}
+
 		if attempt < 2 {
 			continue // Retry
 		}
-		return "", fmt.Errorf("error decoding llama.cpp version document: %w", err)
+		return "", lastErr
 	}
-	
-	return "", fmt.Errorf("failed to get version after 3 attempts: %w", err)
+
+	return "", fmt.Errorf("failed to get version after 3 attempts: %w", lastErr)
 }
 
 func upgradeInstall(libPath string, processor Processor, version string) error {
