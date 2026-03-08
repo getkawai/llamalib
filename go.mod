@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/ebitengine/purego v0.10.0
-	github.com/getkawai/tools v0.1.1
+	github.com/getkawai/tools v0.1.5
 	github.com/google/uuid v1.6.0
 	github.com/jupiterrider/ffi v0.6.0
 	github.com/kawai-network/grab v0.1.0
