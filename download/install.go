@@ -96,7 +96,21 @@ func downloadVersionFile(llamaCppVersionDocURL string) (string, error) {
 	var lastErr error
 	
 	for attempt := 0; attempt < 3; attempt++ {
-		r, err := http.DefaultClient.Get(llamaCppVersionDocURL)
+		req, err := http.NewRequest("GET", llamaCppVersionDocURL, nil)
+		if err != nil {
+			lastErr = fmt.Errorf("error creating llama.cpp version request: %w", err)
+			if attempt < 2 {
+				continue
+			}
+			return "", lastErr
+		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+		if token := githubToken(); token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+
+		r, err := http.DefaultClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("error getting llama.cpp version document: %w", err)
 			if attempt < 2 {

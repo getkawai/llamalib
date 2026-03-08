@@ -57,6 +57,9 @@ func getLatestVersion() (string, error) {
 	// Set required headers for GitHub API
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if token := githubToken(); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	client := &http.Client{
 		Timeout: 30 * time.Second,
