@@ -12,12 +12,10 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/ebitengine/purego v0.10.0 h1:QIw4xfpWT6GWTzaW5XEKy3HXoqrJGx1ijYHzTF0/ISU=
 github.com/ebitengine/purego v0.10.0/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
-github.com/getkawai/tools v0.1.1 h1:DbUwTkND7t5fSQEBfw+5mJY+fL9Z4fSusO/w4SLtE1I=
-github.com/getkawai/tools v0.1.1/go.mod h1:856cjJSlczKvW3npII2Wv6hL4xS+CsBTtD1MdDYU/sI=
 github.com/getkawai/tools v0.1.5 h1:bNQaUTS+oOwGROZGDPl5ikZa527TtPqrH/tGnIt9rLQ=
 github.com/getkawai/tools v0.1.5/go.mod h1:3Fxru8JPbWGVaE/o8kzuvYuDT8ux2F4Jp7Ngg1xS2R0=
-github.com/getkawai/unillm v0.1.1 h1:Y77gVMNS990xsELknrtDjY6C7Yt6YY8NbhdVwyM1tCk=
-github.com/getkawai/unillm v0.1.1/go.mod h1:vGzh5s0pBFJ2M0ywakzrLNhHlwKNwgX1J/qME6HEeM0=
+github.com/getkawai/unillm v0.1.2 h1:swJSGMyj3Bp8cB59WE/QBIRNUJLYyg1yXPGYC2ErWLw=
+github.com/getkawai/unillm v0.1.2/go.mod h1:EBnus229YgSr8DdxjG/VCrLgKS0R5/DFcvNb5AZNkok=
 github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e h1:Lf/gRkoycfOBPa42vU2bbgPurFong6zXeFtPoxholzU=
 github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e/go.mod h1:uNVvRXArCGbZ508SxYYTC5v1JWoz2voff5pm25jU1Ok=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=

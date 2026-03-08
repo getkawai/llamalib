@@ -17,7 +17,7 @@ require (
 	github.com/RealAlexandreAI/json-repair v0.0.15 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20260225200202-61df8bc4b903 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/getkawai/unillm v0.1.1 // indirect
+	github.com/getkawai/unillm v0.1.2 // indirect
 	github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
