@@ -218,11 +218,12 @@ func GetWithContext(ctx context.Context, architecture string, operatingSystem st
 		return ErrUnknownProcessor
 	}
 
-	if err := VersionIsValid(version); err != nil {
-		return ErrInvalidVersion
+	resolvedVersion, err := ResolveVersion(version)
+	if err != nil {
+		return err
 	}
 
-	location, filename, err := getDownloadLocationAndFilename(arch, os, prcssr, version, dest)
+	location, filename, err := getDownloadLocationAndFilename(arch, os, prcssr, resolvedVersion, dest)
 	if err != nil {
 		return err
 	}

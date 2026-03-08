@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+const EnvLlamaCppVersion = "LLAMA_CPP_VERSION"
+
 func githubToken() string {
 	if v := strings.TrimSpace(os.Getenv("GH_TOKEN")); v != "" {
 		return v
@@ -13,4 +15,8 @@ func githubToken() string {
 		return v
 	}
 	return ""
+}
+
+func llamaCppVersionOverride() string {
+	return strings.TrimSpace(os.Getenv(EnvLlamaCppVersion))
 }

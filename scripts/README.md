@@ -2,6 +2,28 @@
 
 Script untuk sync packages dari upstream [yzma](https://github.com/hybridgroup/yzma) ke llamalib.
 
+## Cek Latest llama.cpp Version (Manual)
+
+Gunakan script ini untuk cek versi release terbaru llama.cpp secara manual:
+
+```bash
+./scripts/check-latest-llama-version.sh
+```
+
+Jika ingin menghindari request unauthenticated ke GitHub API (rate limit rendah), set salah satu env var berikut:
+
+```bash
+export GH_TOKEN=...
+# atau
+export GITHUB_TOKEN=...
+```
+
+Untuk memaksa instalasi/download ke versi tertentu tanpa call `releases/latest`, set:
+
+```bash
+export LLAMA_CPP_VERSION=b7225
+```
+
 ## Packages yang di-sync
 
 Script ini men-sync packages berikut dari yzma:

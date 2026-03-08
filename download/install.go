@@ -11,10 +11,7 @@ import (
 	"strings"
 )
 
-var (
-	llamaCppVersionDocURL = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
-	versionFile           = "version.json"
-)
+var versionFile = "version.json"
 
 type tag struct {
 	TagName string `json:"tag_name"`
@@ -74,7 +71,7 @@ func alreadyLatestVersion(libPath string) (bool, string, error) {
 		return false, "", fmt.Errorf("error unmarshalling version info: %w", err)
 	}
 
-	version, err := LlamaLatestVersion()
+	version, err := ResolveVersion("")
 	if err != nil {
 		return false, "", fmt.Errorf("error install: %w", err)
 	}
@@ -83,9 +80,9 @@ func alreadyLatestVersion(libPath string) (bool, string, error) {
 }
 
 func initialInstall(libPath string, processor Processor) error {
-	version, err := downloadVersionFile(llamaCppVersionDocURL)
+	version, err := ResolveVersion("")
 	if err != nil {
-		return fmt.Errorf("error downloading llama.cpp version document: %w", err)
+		return fmt.Errorf("error resolving llama.cpp version: %w", err)
 	}
 
 	return upgradeInstall(libPath, processor, version)
