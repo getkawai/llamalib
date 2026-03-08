@@ -11,10 +11,7 @@ import (
 	"strings"
 )
 
-var (
-	llamaCppVersionDocURL = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
-	versionFile           = "version.json"
-)
+var versionFile = "version.json"
 
 type tag struct {
 	TagName string `json:"tag_name"`
@@ -74,7 +71,7 @@ func alreadyLatestVersion(libPath string) (bool, string, error) {
 		return false, "", fmt.Errorf("error unmarshalling version info: %w", err)
 	}
 
-	version, err := LlamaLatestVersion()
+	version, err := ResolveVersion("")
 	if err != nil {
 		return false, "", fmt.Errorf("error install: %w", err)
 	}
@@ -83,9 +80,9 @@ func alreadyLatestVersion(libPath string) (bool, string, error) {
 }
 
 func initialInstall(libPath string, processor Processor) error {
-	version, err := downloadVersionFile(llamaCppVersionDocURL)
+	version, err := ResolveVersion("")
 	if err != nil {
-		return fmt.Errorf("error downloading llama.cpp version document: %w", err)
+		return fmt.Errorf("error resolving llama.cpp version: %w", err)
 	}
 
 	return upgradeInstall(libPath, processor, version)
@@ -96,7 +93,21 @@ func downloadVersionFile(llamaCppVersionDocURL string) (string, error) {
 	var lastErr error
 	
 	for attempt := 0; attempt < 3; attempt++ {
-		r, err := http.DefaultClient.Get(llamaCppVersionDocURL)
+		req, err := http.NewRequest("GET", llamaCppVersionDocURL, nil)
+		if err != nil {
+			lastErr = fmt.Errorf("error creating llama.cpp version request: %w", err)
+			if attempt < 2 {
+				continue
+			}
+			return "", lastErr
+		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+		if token := githubToken(); token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+
+		r, err := http.DefaultClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("error getting llama.cpp version document: %w", err)
 			if attempt < 2 {

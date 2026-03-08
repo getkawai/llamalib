@@ -86,6 +86,9 @@ jobs:
           echo "YZMA_TEST_SPLIT_MODELS=$GITHUB_WORKSPACE/models/stories15M-q8_0-00001-of-00003.gguf,$GITHUB_WORKSPACE/models/stories15M-q8_0-00002-of-00003.gguf,$GITHUB_WORKSPACE/models/stories15M-q8_0-00003-of-00003.gguf" >> "$GITHUB_ENV"
 
       - name: Run unit tests
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
         run: |
           go test -v ./...
 

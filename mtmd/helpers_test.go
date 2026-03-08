@@ -48,7 +48,7 @@ func testCleanup(t *testing.T) {
 func testSetupChunks(t *testing.T, ctx Context, chunks InputChunks) {
 	text := NewInputText("Here is an image: <__media__>", true, true)
 
-	data, x, y, err := openImageFile("testdata/images/domestic_llama.jpg")
+	data, x, y, err := openImageFile("../images/domestic_llama.jpg")
 	if err != nil {
 		t.Fatal("could not open image file")
 	}
